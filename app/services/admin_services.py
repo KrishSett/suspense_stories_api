@@ -1,8 +1,10 @@
 # admin_services.py
-
-from app.db.conn import db
+from db import db
 
 def list_admin():
-    admins = db.admins.find({}, {"_id": 0})
-    return list(admins)
+    admins = db.admins.find(
+        {"is_active": True},
+        {"_id": 0, "firstname": 1, "lastname": 1, "email": 1}
+    )
+    return admins
 

@@ -1,20 +1,19 @@
 # admins.py
-
-from fastapi import APIRouter
-from pydantic import BaseModel
-import app.services.admin_services as admin
+from fastapi import APIRouter, HTTPException
+from typing import List, Union
+from app.models import AdminCreate, AdminList
+from app.services import admin_services
 
 apiRouter = APIRouter(
     prefix="/admins",
     tags=['admins']
 )
 
-class Admin(BaseModel):
-    firstname: str
-    lastname: str
-    email: str
-    password: str
-
-@apiRouter.get("/")
+@apiRouter.get("/list", response_model=List[AdminList])
 def list_admins():
-    return admin.list_admin()
+    admins = admin_services.list_admin()
+
+    if not admins:
+        raise HTTPException(status_code=404, detail="No admins found.")
+
+    return admins

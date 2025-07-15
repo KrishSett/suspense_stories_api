@@ -11,3 +11,9 @@
 - Push notification on new stories
 - Pagination support 
 - Rate limiting for API endpoints
+
+### Future Implementations
+
+- Motor to use async await functions
+- Redis caching mongo query cache
+- JWT authentication for dual auth guard

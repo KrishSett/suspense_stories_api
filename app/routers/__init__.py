@@ -1,0 +1,1 @@
+from app.routers.admins import apiRouter as adminRouter
