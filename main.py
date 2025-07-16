@@ -1,8 +1,7 @@
 # main.py
-
 from typing import Union
 from fastapi import FastAPI
-from app.routers import adminRouter
+from app.routers import adminRouter, authRouter
 
 app = FastAPI(
     docs_url=None,         # disables Swagger UI at /docs
@@ -10,4 +9,6 @@ app = FastAPI(
     openapi_url=None       # disables the OpenAPI JSON at /openapi.json
 )
 
+app.include_router(authRouter)
 app.include_router(adminRouter)
+

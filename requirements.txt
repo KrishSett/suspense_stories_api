@@ -2,3 +2,5 @@ python == 3.13.5
 pymongo == 4.13.2
 fastapi == 0.116.1
 dotenv == 1.1.1
+python-jose == 3.5.0
+passlib == 1.7.4

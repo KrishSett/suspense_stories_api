@@ -1,3 +1,4 @@
-import app.services.admin_services as admin_services
+# app/services/__init__.py
+from app.services.admin_services import AdminService
 
-__all__ = ['admin_services']
+__all__ = ['AdminService']
