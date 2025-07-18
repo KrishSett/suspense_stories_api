@@ -1,13 +1,6 @@
-# conn.py
-from pymongo import MongoClient
+import asyncio
+from motor.motor_asyncio import AsyncIOMotorClient
 from config import config
 
-client = MongoClient(config['mongo_url'])
-
-# Check connection
-try:
-    client.admin.command("ping")
-except Exception as e:
-    raise ConnectionError(f"Failed to connect to MongoDB: {e}")
-
+client = AsyncIOMotorClient(config['mongo_url'])
 db = client[config["mongo_db"]]

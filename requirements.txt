@@ -1,6 +1,9 @@
-python == 3.13.5
+#python == 3.13.5
 pymongo == 4.13.2
 fastapi == 0.116.1
-dotenv == 1.1.1
+dotenv == 0.9.9
 python-jose == 3.5.0
 passlib == 1.7.4
+yt-dlp == 2025.6.30
+motor == 3.7.1
+aiokafka == 0.12.0

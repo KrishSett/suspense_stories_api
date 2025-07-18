@@ -7,3 +7,6 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: str
     type: Literal["admin", "user"]
+
+class TokenRefreshRequest(BaseModel):
+    refresh_token: str
