@@ -9,6 +9,7 @@ class AdminService(BaseService):
     def __init__(self):
         super().__init__()
 
+    # List of active admins
     async def list_admins(self) -> Optional[list]:
         try:
             admins = self.db.admins.find(
@@ -17,16 +18,21 @@ class AdminService(BaseService):
             )
             return await admins.to_list(length=None)
         except PyMongoError as e:
-            print(f"Database error: {e}")
             raise HTTPException(status_code=500, detail="Could not fetch admin data")
 
-    async def find_admin_with_email(self, email: EmailStr) :
+
+    # Find admin by email and return objectId + email
+    async def find_admin_with_email(self, email: EmailStr):
         try:
             admin = await self.db.admins.find_one(
                 {"email": email, "is_active": True},
-                {"_id": 0, "firstname": 1, "lastname": 1, "email": 1, "password_hash": 1}
+                {"_id": 1, "firstname": 1, "lastname": 1, "email": 1, "password_hash": 1}
             )
-            return admin
+            return {
+                "objectId": str(admin["_id"]),
+                "email": admin["email"],
+                "password_hash": str(admin["password_hash"])
+            }
         except PyMongoError as e:
             print(f"Database error: {e}")
             raise HTTPException(status_code=500, detail="Could not fetch admin data")

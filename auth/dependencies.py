@@ -24,4 +24,4 @@ class JWTAuthGuard:
         if role != self.expected_role:
             raise HTTPException(status_code=403, detail=f"{self.expected_role.capitalize()}s only")
 
-        return payload["sub"]  # or return payload if you need more
+        return payload

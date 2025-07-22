@@ -1,4 +1,5 @@
 # app/services/__init__.py
-from app.services.admin_services import AdminService
+from .admin_services import AdminService
+from .channel_service import ChannelService
 
-__all__ = ['AdminService']
+__all__ = ['AdminService', 'ChannelService']
