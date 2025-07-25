@@ -1,4 +1,3 @@
-# auth.py
 from fastapi import APIRouter, HTTPException
 from app.models import LoginRequest, TokenRefreshRequest
 from common.password_utils import PasswordHasher
@@ -17,18 +16,27 @@ password_hash = PasswordHasher()
 admin_service = AdminService()
 
 @apiRouter.post("/admin")
-async def login(form: LoginRequest):
+async def login(data: LoginRequest):
     try:
-        if form.type.strip().lower() != "admin":
+        if data.type.strip().lower() != "admin":
             raise HTTPException(status_code=403, detail="Unauthorized")
 
-        admin = await admin_service.find_admin_with_email(form.email)
+        admin = await admin_service.find_admin_with_email(data.email)
 
-        if not admin or not password_hash.verify(form.password, admin["password_hash"]):
+        if not admin or not password_hash.verify(data.password, admin["password_hash"]):
             raise HTTPException(status_code=401, detail="Invalid credentials")
 
-        access_token = await jwt_auth.create_access_token({"id": admin["objectId"], "sub": admin["email"], "role": "admin"})
-        refresh_auth_token = await jwt_auth.create_refresh_token({"id": admin["objectId"], "sub": admin["email"], "role": "admin"})
+        access_token = await jwt_auth.create_access_token({
+            "id": admin["objectId"],
+            "sub": admin["email"],
+            "role": "admin"
+        })
+        refresh_auth_token = await jwt_auth.create_refresh_token({
+            "id": admin["objectId"],
+            "sub": admin["email"],
+            "role": "admin"
+        })
+
         encoded_refresh_token = base64.b64encode(refresh_auth_token.encode('ascii'))
 
         return {
@@ -40,18 +48,17 @@ async def login(form: LoginRequest):
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
 @apiRouter.post("/token/refresh")
-async def refresh_token(request: TokenRefreshRequest):
+async def refresh_token(data: TokenRefreshRequest):
     try:
-        payload = await jwt_auth.decode_refresh_token(request.refresh_token)
+        payload = await jwt_auth.decode_refresh_token(data.refresh_token)
         if not payload:
             raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
 
-        # issue a new access token
         new_access_token = await jwt_auth.create_access_token({
             "id": payload.get("id"),
             "sub": payload.get("sub"),

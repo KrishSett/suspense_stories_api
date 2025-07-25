@@ -1,30 +1,30 @@
-# channel_service.py
+from typing import Optional
 from fastapi import HTTPException
 from pymongo.errors import PyMongoError
-from app.models import ChannelCreate, ChannelList
+from bson import ObjectId, errors as bson_errors
 from app.services.base_service import BaseService
-from bson import ObjectId
+from utils.helpers import get_current_iso_timestamp
 
 class ChannelService(BaseService):
     def __init__(self):
         super().__init__()
 
-    # Create a new channel
-    async def create_channel(self, channel_data: ChannelCreate, created_by) -> ChannelList:
+    async def create_channel(self, channel_data: dict, created_by: str) -> Optional[dict]:
         try:
-            # Convert to dict, exclude None values
-            data_dict = channel_data.dict(exclude_none=True, by_alias=True)
+            data_dict = channel_data
 
-            # Convert created_by to ObjectId
-            data_dict["created_by"] = ObjectId(created_by)
+            try:
+                data_dict["created_by"] = ObjectId(created_by)
+            except bson_errors.InvalidId:
+                raise HTTPException(status_code=400, detail="Invalid creator ID")
 
-            # Insert into MongoDB
+            timestamp = get_current_iso_timestamp()
+            data_dict['created_at'] = timestamp
+            data_dict['updated_at'] = timestamp
+
             result = await self.db.channels.insert_one(data_dict)
 
-            return {"_id": str(result.inserted_id)}
+            return {"channel_id": str(result.inserted_id), "created_at": timestamp, "status": True}
 
         except PyMongoError as e:
-            print(f"Database error: {e}")
             raise HTTPException(status_code=500, detail="Could not create channel")
-
-

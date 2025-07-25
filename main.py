@@ -1,72 +1,51 @@
 # main.py
-import traceback
-import logging
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.concurrency import iterate_in_threadpool
+from logging_setup import logger
+import traceback
+from app.middleware.logging_middleware import LoggingMiddleware
 from app.routers import adminRouter, authRouter
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.FileHandler("app.log"),
-        logging.StreamHandler()
-    ]
-)
-
-logger = logging.getLogger(__name__)
-
-# Custom middleware for logging requests and responses
-class LoggingMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        # Log the request
-        body = await request.body()
-        logger.info(f"[REQUEST] {request.method} {request.url} | Body: {body.decode('utf-8')}")
-
-        try:
-            response: Response = await call_next(request)
-
-            if "application/json" in response.headers.get("content-type", ""):
-                response_body = b""
-                async for chunk in response.body_iterator:
-                    response_body += chunk
-
-                # Wrap the response body back in an async iterator
-                response.body_iterator = iterate_in_threadpool([response_body])
-
-                logger.info(f"[RESPONSE] {request.method} {request.url} [{response.status_code}] | Body: {response_body.decode('utf-8')}")
-            else:
-                logger.info(f"[RESPONSE] {request.method} {request.url} [{response.status_code}] | Non-JSON response")
-
-            return response
-
-        except Exception as e:
-            logger.error(f"[ERROR] {request.method} {request.url} | {str(e)}\n{traceback.format_exc()}")
-            return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
-
-
-# Initialize app
+# Initialize FastAPI app with docs disabled
 app = FastAPI(
-    docs_url=None,         # disables Swagger UI at /docs
-    redoc_url=None,        # disables ReDoc at /redoc
-    openapi_url=None       # disables the OpenAPI JSON at /openapi.json
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None
 )
 
-# Register middleware
-app.add_middleware(LoggingMiddleware)
-
-# Register routers
+# Add middleware and routers
+app.add_middleware(LoggingMiddleware, logger=logger)
 app.include_router(authRouter)
 app.include_router(adminRouter)
 
-# Optional global error handler
+# Global error handler
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    logger.error(f"[UNHANDLED EXCEPTION] {str(exc)}\n{traceback.format_exc()}")
+    tb = traceback.format_exc()
+    logger.error(f"[UNHANDLED EXCEPTION] {request.method} {request.url} | {exc}\n{tb}")
+
     return JSONResponse(
         status_code=500,
-        content={"detail": "An unexpected error occurred"}
+        content={
+            "error": str(exc),
+            "trace": tb
+        }
+    )
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    logger.warning(f"[HTTP ERROR] {request.method} {request.url} | {exc.detail}")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail}
+    )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    logger.warning(f"[VALIDATION ERROR] {request.method} {request.url} | {exc.errors()}")
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors()}
     )

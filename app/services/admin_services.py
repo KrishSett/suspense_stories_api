@@ -22,7 +22,7 @@ class AdminService(BaseService):
 
 
     # Find admin by email and return objectId + email
-    async def find_admin_with_email(self, email: EmailStr):
+    async def find_admin_with_email(self, email: EmailStr) -> Optional[dict]:
         try:
             admin = await self.db.admins.find_one(
                 {"email": email, "is_active": True},
@@ -34,5 +34,4 @@ class AdminService(BaseService):
                 "password_hash": str(admin["password_hash"])
             }
         except PyMongoError as e:
-            print(f"Database error: {e}")
             raise HTTPException(status_code=500, detail="Could not fetch admin data")

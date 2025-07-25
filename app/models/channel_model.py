@@ -17,6 +17,8 @@ class ChannelBase(MongoBaseModel):
 # Model for creating a channel
 class ChannelCreate(ChannelBase):
     created_by: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
 
 # Model for updating a channel
 class ChannelUpdate(MongoBaseModel):
@@ -25,8 +27,9 @@ class ChannelUpdate(MongoBaseModel):
     thumbnail_url: Optional[HttpUrl] = None
     order_position: Optional[int] = None
     is_active: Optional[bool] = None
+    updated_at: Optional[str] = None
 
 # Model for returning a channel in response
-class ChannelList(ChannelBase):
-    _id: str
-
+class ChannelList(MongoBaseModel):
+    channel_id: str
+    status: bool = True

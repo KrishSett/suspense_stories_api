@@ -1,5 +1,5 @@
 # auth_model.py
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr
 from typing import Literal
 
 # Login request model

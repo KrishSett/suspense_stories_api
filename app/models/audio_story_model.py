@@ -1,34 +1,30 @@
-# audio_story_model.py
-from pydantic import Field
-from typing import Optional
+from pydantic import BaseModel, Field
+from typing import Optional, Dict, Any
 from .base_model import MongoBaseModel, PyObjectId
 
-# Base model for audio story
-class AudioStoryBase(MongoBaseModel):
-    name: str
+# Input model for creating
+class AudioStoryCreate(BaseModel):
     channel_id: str
-    thumbnail: str
-    description: str
-    title: str
+    file_path: str
+
+# Response after creation
+class AudioStoryQueuedResponse(BaseModel):
+    story_id: str
     file_name: str
-    file_path: Optional[str] = None
-    is_ready: Optional[bool] = False
+    status: str = "queued"
 
-# Model for creating audio story
-class AudioStoryCreate(AudioStoryBase):
-    pass
-
-# Model for updating audio story
-class AudioStoryUpdate(MongoBaseModel):
+# Full DB model base
+class AudioStoryDB(MongoBaseModel):
+    channel_id: str
+    file_path: str
+    file_name: Optional[str] = None
     name: Optional[str] = None
-    channel_id: Optional[str] = None
+    title: Optional[str] = None
     thumbnail: Optional[str] = None
     description: Optional[str] = None
-    title: Optional[str] = None
-    file_name: Optional[str] = None
-    file_path: Optional[str] = None
-    is_ready: Optional[bool] = None
+    is_ready: Optional[bool] = False
+    meta_details: Optional[Dict[str, Any]] = None
 
-# Model for listing audio story
-class AudioStoryList(AudioStoryBase):
+# For listing
+class AudioStoryList(AudioStoryDB):
     id: PyObjectId = Field(alias="_id")

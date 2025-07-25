@@ -1,3 +1,4 @@
+# app/models/__init__.py
 from .admin_model import *
 from .auth_model import *
 from .channel_model import *
