@@ -2,14 +2,13 @@
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from typing import List
 import uuid
-from redis import Redis
-from rq import Queue
 from auth.dependencies import JWTAuthGuard
 from app.models import AdminList
 from app.models import ChannelList, ChannelCreate
 from app.models.audio_story_model import AudioStoryCreate, AudioStoryQueuedResponse
 from app.services import AdminService, ChannelService, AudioStoriesService
 from app.jobs import download_audio_and_get_info
+from common import RedisHashCache
 
 apiRouter = APIRouter(
     prefix="/admins",
@@ -20,20 +19,30 @@ apiRouter = APIRouter(
 admin_service = AdminService()
 channel_service = ChannelService()
 audio_stories_service = AudioStoriesService()
-redis_conn = Redis()
-queue = Queue(connection=redis_conn)
 
 @apiRouter.get("/list", response_model=List[AdminList])
 async def list_admins(current_user: dict = Depends(JWTAuthGuard("admin"))):
+    cache = RedisHashCache(cache_key="admin_list")
+
     try:
+        admins = await cache.h_get("list_admins")
+
+        if admins is not None:
+            return admins
+
         admins = await admin_service.list_admins()
 
         if not admins:
             raise HTTPException(status_code=404, detail="No admins found.")
 
+        await cache.h_set(field="list_admins", value=admins, ttl=1500)
         return admins
+
+    except HTTPException:
+        raise  # Re-raise so FastAPI handles it properly
     except Exception as e:
-        raise HTTPException(status_code=500, detail="Error retrieving admin list.")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @apiRouter.post("/channel-create", response_model=ChannelList)
 async def create_channel(

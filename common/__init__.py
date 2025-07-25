@@ -1,4 +1,5 @@
 # common/__init__.py
-from common.password_utils import PasswordHasher
+from .password_utils import PasswordHasher
+from .cache import RedisHashCache
 
-__all__ = ['PasswordHasher']
+__all__ = ['PasswordHasher', 'RedisHashCache']
