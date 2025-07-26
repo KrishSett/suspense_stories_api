@@ -118,7 +118,7 @@ async def create_audio_story(
 ):
     # Validate channel exists and is active
     channel = await channel_service.find_channel_by_id(data.channel_id)
-    if not channel or not channel.get("is_active", False):
+    if not channel:
         raise HTTPException(status_code=400, detail="Channel is invalid or inactive.")
 
     file_name = f"story_{uuid.uuid4().hex}.m4a"
