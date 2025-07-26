@@ -13,7 +13,10 @@ class PasswordHasher:
         try:
             return self.pwd_context.verify(plain_password, hashed_password)
         except UnknownHashError:
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid password hash format"
-            )
+            raise HTTPException(status_code=400, detail="Invalid password hash format")
+
+
+ph = PasswordHasher()
+hash_password = ph.hash('User_1')
+
+print(hash_password)

@@ -29,7 +29,24 @@ class AudioStoriesService(BaseService):
             return {"story_id": str(result.inserted_id), "file_name": story_data["file_name"], "status": "queued"}
         except PyMongoError as e:
             raise HTTPException(status_code=500, detail="Could not create audio story")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail="An unexpected error occurred while creating the audio story")
 
+    # Delete an audio story by ID
+    async def delete_audio_story(self, story_id: str) -> bool:
+        try:
+            result = await self.db.audio_stories.delete_one({"_id": ObjectId(story_id)})
+            if result.deleted_count == 0:
+                raise HTTPException(status_code=404, detail="Audio story not found")
+            return True
+        except bson_errors.InvalidId:
+            raise HTTPException(status_code=400, detail="Invalid audio story ID")
+        except PyMongoError as e:
+            raise HTTPException(status_code=500, detail="Could not delete audio story")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail="An unexpected error occurred while deleting the audio story")
+
+    # Mark an audio story as ready with metadata
     async def mark_ready(self, channel_id: str, file_path: str, meta_info: dict) -> bool:
        try:
            await self.db.audio_stories.update_one(
@@ -44,5 +61,9 @@ class AudioStoriesService(BaseService):
            )
 
            return True
+       except bson_errors.InvalidId:
+              raise HTTPException(status_code=400, detail="Invalid channel ID or file path")
+       except PyMongoError as e:
+              raise HTTPException(status_code=500, detail="Could not update audio story as ready")
        except Exception as e:
            raise HTTPException(status_code=500, detail="Could not update audio story as ready")

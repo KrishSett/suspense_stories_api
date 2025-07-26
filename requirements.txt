@@ -4,7 +4,8 @@ fastapi == 0.116.1
 dotenv == 0.9.9
 python-jose == 3.5.0
 passlib == 1.7.4
-yt-dlp == 2025.6.30
+yt-dlp == 2025.7.21
 motor == 3.7.1
 rq == 2.4.1
 redis == 5.2.1
+bcrypt == 3.2.2

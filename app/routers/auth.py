@@ -2,11 +2,11 @@ from fastapi import APIRouter, HTTPException
 from app.models import LoginRequest, TokenRefreshRequest
 from common.password_utils import PasswordHasher
 from auth.jwt_auth import JWTAuth
-from app.services import AdminService
+from app.services import AdminService, UserService
 import base64
 from config import config
 
-apiRouter = APIRouter(
+authRouter = APIRouter(
     prefix="/auth",
     tags=['auth']
 )
@@ -14,8 +14,10 @@ apiRouter = APIRouter(
 jwt_auth = JWTAuth()
 password_hash = PasswordHasher()
 admin_service = AdminService()
+user_service = UserService()
 
-@apiRouter.post("/admin")
+# Admin login endpoint
+@authRouter.post("/admin")
 async def login(data: LoginRequest):
     try:
         if data.type.strip().lower() != "admin":
@@ -51,8 +53,45 @@ async def login(data: LoginRequest):
     except Exception:
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
+# User login  endpoint
+@authRouter.post("/user")
+async def user_login(data: LoginRequest):
+    try:
+        if data.type.strip().lower() != "user":
+            raise HTTPException(status_code=403, detail="Unauthorized")
 
-@apiRouter.post("/token/refresh")
+        user = await user_service.find_user_with_email(data.email)
+
+        if not user or not password_hash.verify(data.password, user["password_hash"]):
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+
+        access_token = await jwt_auth.create_access_token({
+            "id": user["objectId"],
+            "sub": user["email"],
+            "role": "user"
+        })
+        refresh_auth_token = await jwt_auth.create_refresh_token({
+            "id": user["objectId"],
+            "sub": user["email"],
+            "role": "user"
+        })
+
+        encoded_refresh_token = base64.b64encode(refresh_auth_token.encode('ascii'))
+
+        return {
+            "success": True,
+            "access_token": access_token,
+            "refresh_token": encoded_refresh_token,
+            "expires_in": config["token_expiry"] * 60
+        }
+
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+
+# Refresh token endpoint
+@authRouter.post("/token/refresh")
 async def refresh_token(data: TokenRefreshRequest):
     try:
         payload = await jwt_auth.decode_refresh_token(data.refresh_token)

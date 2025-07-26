@@ -29,9 +29,34 @@ mail_password = os.getenv("MAIL_PASSWORD", "app.log")
 mail_from = os.getenv("MAIL_FROM", "app.log")
 file_download_dir = os.getenv("FILE_DOWNLOAD_DIR", "downloads")
 ffmpeg_path = os.getenv("FFMPEG_PATH")
+redis_host = os.getenv("REDIS_HOST", "localhost")
+redis_port = int(os.getenv("REDIS_PORT", 6379))
+redis_db = int(os.getenv("REDIS_DB", 0))
+cache_prefix = os.getenv("CACHE_PREFIX", "app_cache")
 
+# Validate critical environment variables
+if not app_name:
+    raise EnvironmentError("APP_NAME environment variable is not set.")
+if not secret_key:
+    raise EnvironmentError("SECRET_KEY environment variable is not set.")
+if not mail_mailer:
+    raise EnvironmentError("MAIL_MAILER environment variable is not set.")
+if not mail_host:
+    raise EnvironmentError("MAIL_HOST environment variable is not set.")
+if not mail_port:
+    raise EnvironmentError("MAIL_PORT environment variable is not set.")
+if not mail_username:
+    raise EnvironmentError("MAIL_USERNAME environment variable is not set.")
+if not mail_password:
+    raise EnvironmentError("MAIL_PASSWORD environment variable is not set.")
+if not mail_from:
+    raise EnvironmentError("MAIL_FROM environment variable is not set.")
+if not file_download_dir:
+    raise EnvironmentError("FILE_DOWNLOAD_DIR environment variable is not set.")
+if not ffmpeg_path:
+    raise EnvironmentError("FFMPEG_PATH environment variable is not set.")
 if not mongo_url or not mongo_db:
-    raise EnvironmentError("Missing critical environment variables: MONGO_URL or MONGO_DB.")
+    raise EnvironmentError("MONGO_URL and MONGO_DB environment variables must be set.")
 
 # Return config as a dictionary
 config = {
@@ -50,5 +75,9 @@ config = {
     "mail_password": mail_password,
     "mail_from": mail_from,
     "file_download_dir": file_download_dir,
-    "ffmpeg_path": ffmpeg_path
+    "ffmpeg_path": ffmpeg_path,
+    "redis_host": redis_host,
+    "redis_port": redis_port,
+    "redis_db": redis_db,
+    "cache_prefix": cache_prefix
 }

@@ -1,3 +1,4 @@
 # app/routers/__init__.py
-from .admins import apiRouter as adminRouter
-from .auth import apiRouter as authRouter
+from .admins import adminRouter
+from .auth import authRouter
+from .users import userRouter
