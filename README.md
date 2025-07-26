@@ -5,14 +5,17 @@
 ### Features
 - Dual Authentication System (User and Admin roles)
 - CRUD operations for stories &amp; channels
-- Categorize channels
+- Log of API request &amp; response
 - Channel specific story listings
 - Motor to use async await functions
 - JWT authentication for dual auth guard
+- Usage of FastAPI background jobs
+- Redis caching mongo query cache
+- Email notification on new stories published
 
 ### Future Implementations
-- Redis caching mongo query cache
-- Push notification on new stories
-- Pagination support 
+- Pagination support for list pages (Channel, Story)
 - Rate limiting for API endpoints
-- Usage of kafka queue to run background jobs
+- Search functionality for stories
+- Threading for story processing
+- HTML email templates for notifications
