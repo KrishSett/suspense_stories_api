@@ -3,4 +3,5 @@
 .env
 __pycache__
 api.log
+logs/*
 downloads/*

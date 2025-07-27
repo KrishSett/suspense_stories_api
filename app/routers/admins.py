@@ -2,11 +2,13 @@
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from typing import List
 import uuid
+
+from app.routers.auth import user_service
 from auth.dependencies import JWTAuthGuard
 from app.models import AdminList
 from app.models import ChannelList, ChannelCreate
 from app.models.audio_story_model import AudioStoryCreate, AudioStoryQueuedResponse
-from app.services import AdminService, ChannelService, AudioStoriesService
+from app.services import AdminService, UserService, ChannelService, AudioStoriesService
 from app.jobs import download_audio_and_get_info
 from common import RedisHashCache
 from config import config
@@ -18,6 +20,7 @@ adminRouter = APIRouter(
 
 # Instantiate once to avoid multiple unnecessary DB client initializations
 admin_service = AdminService()
+user_service = UserService()
 channel_service = ChannelService()
 audio_stories_service = AudioStoriesService()
 cache = RedisHashCache(prefix=config["cache_prefix"])
@@ -152,3 +155,24 @@ async def delete_audio_story(story_id: str, current_user: dict = Depends(JWTAuth
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# Deactivate a user
+@adminRouter.get("/user-deactivate/{user_id}")
+async def deactivate_user(user_id: str, current_user: dict = Depends(JWTAuthGuard("admin"))):
+    try:
+        updated = await user_service.update_user(user_id=user_id, update_data={"is_active": False})
+        if not updated:
+            raise HTTPException(status_code=404, detail="User not found.")
+        return {"detail": "User deactivated successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Activate a user
+@adminRouter.get("/user-activate/{user_id}")
+async def deactivate_user(user_id: str, current_user: dict = Depends(JWTAuthGuard("admin"))):
+    try:
+        updated = await user_service.update_user(user_id=user_id, update_data={"is_active": True})
+        if not updated:
+            raise HTTPException(status_code=404, detail="User not found.")
+        return {"detail": "User activated successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
