@@ -15,8 +15,16 @@ class ChannelService(BaseService):
         try:
             channels = self.db.channels.find(
                 {"is_active": True},
-                {"_id": 0, "youtube_channel_id": 1, "title": 1, "created_at": 1, "order_position": 1}
+                {
+                    "_id": 1,
+                    "youtube_channel_id": 1,
+                    "title": 1,
+                    "order_position": 1,
+                    "thumbnail_url": 1,
+                    "description": 1
+                }
             )
+
             result = await channels.to_list(length=None)
             self.logger.info("Fetched %d active channels", len(result))
             return result
@@ -29,7 +37,15 @@ class ChannelService(BaseService):
         try:
             channel = await self.db.channels.find_one(
                 {"_id": ObjectId(channel_id), "is_active": True},
-                {"_id": 0, "youtube_channel_id": 1, "title": 1, "created_at": 1, "order_position": 1}
+                {
+                    "_id": 1,
+                    "youtube_channel_id": 1,
+                    "title": 1,
+                    "order_position": 1,
+                    "thumbnail_url": 1,
+                    "description": 1,
+                    "is_active": 1,
+                 }
             )
             if channel:
                 self.logger.info("Channel found for ID %s", channel_id)
@@ -57,6 +73,7 @@ class ChannelService(BaseService):
             timestamp = get_current_iso_timestamp()
             data_dict["created_at"] = timestamp
             data_dict["updated_at"] = timestamp
+            data_dict["published_at"] = timestamp
 
             result = await self.db.channels.insert_one(data_dict)
             self.logger.info("Channel created successfully with ID %s", str(result.inserted_id))
@@ -92,20 +109,28 @@ class ChannelService(BaseService):
         try:
             current_channel = await self.db.channels.find_one({"_id": ObjectId(channel_id)})
             if not current_channel:
-                self.logger.warning("Channel not found for ID %s", channel_id)
                 raise HTTPException(status_code=404, detail="Channel not found")
 
-            current_position = current_channel.get("order_position", None)
+            current_position = current_channel.get("order_position")
 
             if current_position == order_position:
-                self.logger.info("No changes needed for channel ID %s", channel_id)
                 return {"status": True, "message": "No changes needed"}
 
-            await self.db.channels.update_many(
-                {"order_position": {"$gte": order_position}},
-                {"$inc": {"order_position": 1}}
-            )
+            if order_position < current_position:
+                # Moving UP -> Increment positions for channels in range [order_position, current_position - 1]
+                await self.db.channels.update_many(
+                    {"order_position": {"$gte": order_position, "$lt": current_position}},
+                    {"$inc": {"order_position": 1}}
+                )
 
+            else:
+                # Moving DOWN -> Decrement positions for channels in range [current_position + 1, order_position]
+                await self.db.channels.update_many(
+                    {"order_position": {"$gt": current_position, "$lte": order_position}},
+                    {"$inc": {"order_position": -1}}
+                )
+
+            # Finally update this channel
             result = await self.db.channels.update_one(
                 {"_id": ObjectId(channel_id)},
                 {
@@ -117,14 +142,12 @@ class ChannelService(BaseService):
             )
 
             if result.modified_count == 0:
-                self.logger.warning("No channel order updated for ID %s", channel_id)
                 raise HTTPException(status_code=404, detail="No changes made")
 
-            self.logger.info("Channel order updated successfully for ID %s", channel_id)
             return {"status": True, "message": "Channel order position updated successfully"}
+
         except bson_errors.InvalidId:
-            self.logger.warning("Invalid channel ID for set order: %s", channel_id)
             raise HTTPException(status_code=400, detail="Invalid channel ID")
         except PyMongoError as e:
-            self.logger.error("Error in %s for ID %s: %s", "set_channel_order", channel_id, e)
             raise HTTPException(status_code=500, detail="Could not update channel order position")
+

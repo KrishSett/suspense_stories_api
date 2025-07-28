@@ -133,3 +133,39 @@ class AudioStoriesService(BaseService):
                 e,
             )
             raise HTTPException(status_code=500, detail="Could not update audio story as ready")
+
+    # Get audio story by channel ID
+    async def get_audio_story_by_channel_id(self, channel_id: str) -> Optional[dict]:
+        try:
+            stories_cursor = self.db.audio_stories.find(
+                {"channel_id": channel_id, "is_ready": True},
+                {"_id": 1, "meta_details": 1}
+            ).sort("created_at", -1)
+
+            if not stories_cursor:
+                self.logger.warning("No audio story found for channel ID %s", channel_id)
+                raise HTTPException(status_code=404, detail="Audio story not found")
+
+            stories = await stories_cursor.to_list(length=None)
+            return stories
+        except Exception as e:
+            self.logger.error("Error in %s for channel %s: %s", "get_audio_story_by_channel_id", channel_id, e)
+            raise HTTPException(status_code=500, detail="Could not fetch audio story data")
+
+    # Get audio story file by ID
+    async def get_audio_story_by_id(self, story_id: str) -> Optional[dict]:
+        try:
+            return await self.db.audio_stories.find_one(
+                {"_id": ObjectId(story_id), "is_ready": True},
+                {"_id": 0, "file_name": 1}
+            )
+
+        except bson_errors.InvalidId:
+            self.logger.warning("Invalid audio story ID: %s", story_id)
+            raise HTTPException(status_code=400, detail="Invalid audio story ID")
+
+        except (PyMongoError, Exception) as e:
+            self.logger.error(
+                "Error in get_audio_story_by_id for ID %s: %s", story_id, e, exc_info=True
+            )
+            raise HTTPException(status_code=500, detail="Could not fetch audio story data")

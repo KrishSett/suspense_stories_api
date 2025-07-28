@@ -2,16 +2,16 @@
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from typing import List
 import uuid
-
-from app.routers.auth import user_service
 from auth.dependencies import JWTAuthGuard
 from app.models import AdminList
-from app.models import ChannelList, ChannelCreate
+from app.models import ChannelList, ChannelCreate, ChannelUpdate, ChannelResponse, ChannelSetOrder, ChannelActiveList, ChannelView
 from app.models.audio_story_model import AudioStoryCreate, AudioStoryQueuedResponse
 from app.services import AdminService, UserService, ChannelService, AudioStoriesService
 from app.jobs import download_audio_and_get_info
 from common import RedisHashCache
 from config import config
+from utils.helpers import process_cache_key
+from fastapi.encoders import jsonable_encoder
 
 adminRouter = APIRouter(
     prefix="/admins",
@@ -29,7 +29,9 @@ cache = RedisHashCache(prefix=config["cache_prefix"])
 @adminRouter.get("/list", response_model=List[AdminList])
 async def list_admins(current_user: dict = Depends(JWTAuthGuard("admin"))):
     try:
-        admins = await cache.h_get("list_admins")
+        key = current_user["role"] + "_key"
+        cache_key = process_cache_key(key)
+        admins = await cache.h_get(cache_key, "list_admins")
 
         if admins is not None:
             return admins
@@ -39,9 +41,9 @@ async def list_admins(current_user: dict = Depends(JWTAuthGuard("admin"))):
         if not admins:
             raise HTTPException(status_code=404, detail="No admins found.")
 
-        await cache.h_set(field="list_admins", value=admins, ttl=1500)
+        # Cache the list of admins
+        await cache.h_set(cache_key, "list_admins", admins)
         return admins
-
     except HTTPException:
         raise  # Re-raise so FastAPI handles it properly
     except Exception as e:
@@ -69,46 +71,153 @@ async def create_channel(
             "youtube_channel_id": data.youtube_channel_id,
             "title": data.title,
             "is_active": data.is_active,
-            "order_position": data.order_position
+            "order_position": data.order_position,
+            "description" : data.description,
+            "thumbnail_url": data.thumbnail_url,
+            "created_at": None,
+            "updated_at": None,
+            "published_at": None,
+            "created_by": None
         }
 
         # Inject current user's ID into created_by
         created_by = str(current_user["id"])
         created_channel = await channel_service.create_channel(channel_data, created_by)
+
+        # Delete cache for active channels
+        key = current_user["role"] + "_key"
+        cache_key = process_cache_key(key)
+        await cache.h_del(cache_key, "list_active_channels")
         return created_channel
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 # Deactivate a channel
-@adminRouter.post("/channel-deactivate/{channel_id}")
+@adminRouter.post("/channel-deactivate/{channel_id}", response_model=ChannelResponse)
 async def deactivate_channel(channel_id: str, current_user: dict = Depends(JWTAuthGuard("admin"))):
     try:
         updated = await channel_service.update_channel(channel_id, {"is_active": False})
         if not updated:
             raise HTTPException(status_code=404, detail="Channel not found.")
-        return {"detail": "Channel deactivated successfully."}
+
+        # Delete cache for active channels
+        key = current_user["role"] + "_key"
+        cache_key = process_cache_key(key)
+        await cache.h_del(cache_key, "list_active_channels")
+        return {"status": True, "detail": "Channel deactivated successfully."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 # Activate a channel
-@adminRouter.post("/channel-activate/{channel_id}")
+@adminRouter.post("/channel-activate/{channel_id}", response_model=ChannelResponse)
 async def activate_channel(channel_id: str, current_user: dict = Depends(JWTAuthGuard("admin"))):
     try:
         updated = await channel_service.update_channel(channel_id, {"is_active": True})
         if not updated:
             raise HTTPException(status_code=404, detail="Channel not found.")
-        return {"detail": "Channel activated successfully."}
+
+        # Delete cache for active channels
+        key = current_user["role"] + "_key"
+        cache_key = process_cache_key(key)
+        await cache.h_del(cache_key, "list_active_channels")
+        return {"status": True, "detail": "Channel activated successfully."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 # Set the order of a channel
-@adminRouter.post("/channel-set-order/{channel_id}")
-async def set_channel_order(channel_id: str, order_position: int, current_user: dict = Depends(JWTAuthGuard("admin"))):
+@adminRouter.post("/channel-set-order", response_model=ChannelResponse)
+async def set_channel_order(data: ChannelSetOrder, current_user: dict = Depends(JWTAuthGuard("admin"))):
     try:
+        channel_id = data.channel_id
+        order_position = data.order_position
+
+        # Update channel order-position
         result = await channel_service.set_channel_order(channel_id, order_position)
         if not result:
             raise HTTPException(status_code=404, detail="Channel not found or order update failed.")
-        return {"detail": "Channel order updated successfully."}
+
+        # Delete cache for active channels
+        key = current_user["role"] + "_key"
+        cache_key = process_cache_key(key)
+        await cache.h_del(cache_key, "list_active_channels")
+        return {"status": True, "detail": "Channel order updated successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# List all active channels
+@adminRouter.get("/channel-list", response_model=List[ChannelActiveList])
+async def list_active_channels(current_user: dict = Depends(JWTAuthGuard("admin"))):
+    try:
+        key = f"{current_user['role']}_key"
+        cache_key = process_cache_key(key)
+
+        #Check cache
+        cached_channels = await cache.h_get(cache_key, "list_active_channels")
+        if cached_channels is not None:
+            return cached_channels
+
+        channel_cursor = await channel_service.list_active_channels()
+
+        if not channel_cursor:
+            raise HTTPException(status_code=404, detail="No active channels found.")
+
+        channels = []
+        for ch in channel_cursor:
+            channels.append({
+                "channel_id": str(ch["_id"]),
+                "youtube_channel_id": ch["youtube_channel_id"],
+                "title": ch["title"],
+                "is_active": ch.get("is_active", True),
+                "order_position": ch["order_position"],
+                "description": ch.get("description") or "No description available",
+                "thumbnail_url": ch.get("thumbnail_url") or "https://example.com/default_thumbnail.png",
+                "status": True
+            })
+
+        await cache.h_set(cache_key, "list_active_channels", jsonable_encoder(channels))
+        return channels
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Get a channel byID
+@adminRouter.get('/channel/{channel_id}', response_model=ChannelView)
+async def get_channel_by_id(channel_id: str, current_user: dict = Depends(JWTAuthGuard("admin"))):
+    try:
+        channel = await channel_service.find_channel_by_id(channel_id)
+        if not channel:
+            raise HTTPException(status_code=404, detail="Channel not found.")
+        return {
+                "channel_id": str(channel["_id"]),
+                "youtube_channel_id": channel["youtube_channel_id"],
+                "title": channel["title"],
+                "is_active": channel.get("is_active", True),
+                "order_position": channel["order_position"],
+                "description": channel.get("description") or "No description available",
+                "thumbnail_url": channel.get("thumbnail_url") or "https://example.com/default_thumbnail.png",
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Update a channel
+@adminRouter.put("/channel-update", response_model=ChannelResponse)
+async def update_channel(data: ChannelUpdate, current_user: dict = Depends(JWTAuthGuard("admin"))):
+    try:
+        channel_id = data.channel_id
+        update_data = {
+            "description": data.description,
+            "thumbnail_url": data.thumbnail_url,
+            "updated_at": None
+        }
+
+        updated_channel = await channel_service.update_channel(channel_id, update_data)
+        if not updated_channel:
+            raise HTTPException(status_code=404, detail="Channel not found.")
+
+        # Delete cache for active channels
+        key = current_user["role"] + "_key"
+        cache_key = process_cache_key(key)
+        await cache.h_del(cache_key, "list_active_channels")
+        return {"status": True, "detail": "Channel updated successfully."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -144,7 +253,7 @@ async def create_audio_story(
     return audio_story
 
 # Remove an audio story
-@adminRouter.delete("/story-delete/{story_id}")
+@adminRouter.delete("/story-delete/{story_id}", response_model=ChannelResponse)
 async def delete_audio_story(story_id: str, current_user: dict = Depends(JWTAuthGuard("admin"))):
     try:
         deleted = await audio_stories_service.delete_audio_story(story_id)
@@ -156,7 +265,7 @@ async def delete_audio_story(story_id: str, current_user: dict = Depends(JWTAuth
 
 
 # Deactivate a user
-@adminRouter.get("/user-deactivate/{user_id}")
+@adminRouter.post("/user-deactivate/{user_id}")
 async def deactivate_user(user_id: str, current_user: dict = Depends(JWTAuthGuard("admin"))):
     try:
         updated = await user_service.update_user(user_id=user_id, update_data={"is_active": False})
@@ -167,7 +276,7 @@ async def deactivate_user(user_id: str, current_user: dict = Depends(JWTAuthGuar
         raise HTTPException(status_code=500, detail=str(e))
 
 # Activate a user
-@adminRouter.get("/user-activate/{user_id}")
+@adminRouter.post("/user-activate/{user_id}")
 async def deactivate_user(user_id: str, current_user: dict = Depends(JWTAuthGuard("admin"))):
     try:
         updated = await user_service.update_user(user_id=user_id, update_data={"is_active": True})

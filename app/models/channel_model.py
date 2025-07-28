@@ -1,35 +1,50 @@
 # channel_model.py
-from pydantic import Field, HttpUrl
+from pydantic import BaseModel, constr
 from typing import Optional
 from datetime import datetime
-from .base_model import MongoBaseModel, PyObjectId
 
 # Base model for shared fields
-class ChannelBase(MongoBaseModel):
+class ChannelBase(BaseModel):
     youtube_channel_id: str
     title: str
-    description: Optional[str] = None
-    thumbnail_url: Optional[HttpUrl] = None
-    published_at: Optional[datetime] = None
+    description: Optional[constr(min_length=10, max_length=500)]
+    thumbnail_url: Optional[constr(pattern=r"^https?://[^\s]+$", min_length=5, max_length=500)]
     order_position: int
-    is_active: Optional[bool] = True
 
 # Model for creating a channel
 class ChannelCreate(ChannelBase):
+    is_active: Optional[bool] = True
+    published_at: Optional[datetime] = None
     created_by: Optional[str] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 
+# Model for viewing a channel
+class ChannelView(ChannelBase):
+    channel_id: str
+    is_active: bool = True
+
 # Model for updating a channel
-class ChannelUpdate(MongoBaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    thumbnail_url: Optional[HttpUrl] = None
-    order_position: Optional[int] = None
-    is_active: Optional[bool] = None
-    updated_at: Optional[str] = None
+class ChannelUpdate(BaseModel):
+    channel_id: str
+    description: Optional[constr(min_length=10, max_length=500)]
+    thumbnail_url: Optional[constr(pattern=r"^https?://[^\s]+$", min_length=5, max_length=500)]
 
 # Model for returning a channel in response
-class ChannelList(MongoBaseModel):
+class ChannelList(BaseModel):
     channel_id: str
     status: bool = True
+
+# Model for active channel list
+class ChannelActiveList(ChannelBase):
+    channel_id: str
+
+# Basic response
+class ChannelResponse(BaseModel):
+    status: bool = True
+    detail: str
+
+# Model for returning a channel in response
+class ChannelSetOrder(BaseModel):
+    channel_id: str
+    order_position: int

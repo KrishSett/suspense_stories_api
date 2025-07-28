@@ -14,6 +14,7 @@ load_dotenv(dotenv_path=env_path)
 
 # Access and validate required variables
 app_name = os.getenv("APP_NAME", "APP Name")
+base_url = os.getenv("BASE_URL", "http://localhost:8000")
 mongo_url = os.getenv("MONGO_URL")
 mongo_db = os.getenv("MONGO_DB")
 secret_key = os.getenv("SECRET_KEY")
@@ -37,6 +38,8 @@ cache_prefix = os.getenv("CACHE_PREFIX", "app_cache")
 # Validate critical environment variables
 if not app_name:
     raise EnvironmentError("APP_NAME environment variable is not set.")
+if not base_url:
+    raise EnvironmentError("BASE_URL environment variable is not set.")
 if not secret_key:
     raise EnvironmentError("SECRET_KEY environment variable is not set.")
 if not mail_mailer:
@@ -61,6 +64,7 @@ if not mongo_url or not mongo_db:
 # Return config as a dictionary
 config = {
     "app_name": app_name,
+    "base_url": base_url,
     "mongo_url": mongo_url,
     "mongo_db": mongo_db,
     "secret_key": secret_key,

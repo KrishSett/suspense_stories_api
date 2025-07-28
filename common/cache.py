@@ -11,6 +11,7 @@ class RedisHashCache:
             decode_responses=True
         )
         self.prefix = prefix
+        self.ttl = 1800  # Default TTL of 30 minutes
 
     def generate_slug(self, params: dict) -> str:
         if not params:
@@ -28,11 +29,11 @@ class RedisHashCache:
         else:
             return cache_key
 
-    async def h_set(self, cache_key: str, field: str, value: any, params: dict = None, ttl: int = 60):
+    async def h_set(self, cache_key: str, field: str, value: any, params: dict = None):
         try:
             final_key = self.build_cache_key(cache_key, params)
             await self.redis_client.hset(final_key, field, json.dumps(value))
-            await self.redis_client.expire(final_key, ttl)
+            await self.redis_client.expire(final_key, self.ttl)
         except Exception as e:
             raise Exception(f"[h_set] Redis error: {str(e)}")
 
