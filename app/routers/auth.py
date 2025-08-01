@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, BackgroundTasks
 from app.models import LoginRequest, SignupRequest, TokenRefreshRequest, AccessTokenResponse, RefreshTokenResponse
 from common.access_tokens import AccessTokenManager
 from common.password_utils import PasswordHasher
@@ -6,6 +6,7 @@ from app.services import AdminService, UserService
 from config import config
 from common import RedisHashCache
 from utils.helpers import process_cache_key
+from app.notifications import EmailVerificationNotification
 import uuid
 
 authRouter = APIRouter(
@@ -20,6 +21,7 @@ password_hash = PasswordHasher()
 admin_service = AdminService()
 user_service = UserService()
 cache = RedisHashCache(prefix=config["cache_prefix"])
+email_notification = EmailVerificationNotification()
 
 # Admin login endpoint
 @authRouter.post("/admin", response_model=AccessTokenResponse)
@@ -43,12 +45,15 @@ async def login(data: LoginRequest):
 
 # User signup  endpoint
 @authRouter.post("/user/signup", response_model=AccessTokenResponse)
-async def user_signup(data: SignupRequest):
+async def user_signup(data: SignupRequest, background_tasks: BackgroundTasks):
     try:
         if data.type.strip().lower() != "user":
             raise HTTPException(status_code=403, detail="Unauthorized")
 
         hashed_password = password_hash.hash(data.password)
+        verification_token = str(uuid.uuid4())
+
+        # Create a new user object
         new_user = {
             "firstname": data.firstname,
             "lastname": data.lastname,
@@ -60,7 +65,7 @@ async def user_signup(data: SignupRequest):
             "favorite_channels": [],
             "playlist": [],
             "is_verified": False,
-            "verification_token": str(uuid.uuid4()),
+            "verification_token": verification_token,
             "created_at": None,
             "updated_at": None
         }
@@ -72,6 +77,9 @@ async def user_signup(data: SignupRequest):
 
         # Create access and refresh tokens for the new user
         token_response = await access_token_manager.generate_tokens(user_id=created_user["objectId"], user_email=created_user["email"], role="user")
+
+        # Send email verification in the background
+        background_tasks.add_task(email_notification.notify, created_user["email"], verification_token)
 
         if not token_response:
             raise HTTPException(status_code=500, detail="Could not generate tokens")

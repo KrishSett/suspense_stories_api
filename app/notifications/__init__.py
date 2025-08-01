@@ -1,3 +1,4 @@
 from .send_audio_story_create_notification import AudioStoryNotification
+from .send_email_verification_notification import EmailVerificationNotification
 
-__all__ = ['AudioStoryNotification']
+__all__ = ['AudioStoryNotification', 'EmailVerificationNotification']
