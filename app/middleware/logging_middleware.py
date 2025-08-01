@@ -1,5 +1,5 @@
 from fastapi import Request
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 from logging import Logger
@@ -10,8 +10,15 @@ class LoggingMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: ASGIApp, logger: Logger):
         super().__init__(app)
         self.logger = logger
+        self.exception_routes = [
+            "/users/audio-download/"
+        ]
 
     async def dispatch(self, request: Request, call_next):
+        if request.url.path in self.exception_routes:
+            return await call_next(request)
+
+        # Log request body
         body_bytes = await request.body()
         try:
             json_body = json.loads(body_bytes)
@@ -19,18 +26,18 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         except (json.JSONDecodeError, UnicodeDecodeError):
             body = body_bytes.decode("utf-8", errors="ignore")
 
-        self.logger.info(f"[REQUEST] {request.method} {request.url} - {str(body)}")
+        self.logger.info(f"[REQUEST] {request.method} {request.url} - {body}")
 
         try:
-            # Capture the response
+            # 🔹 Get Response
             response = await call_next(request)
 
-            # Read and log response body
+            # Read response body safely
             response_body = b""
             async for chunk in response.body_iterator:
                 response_body += chunk
 
-            # Clone the response so FastAPI can send it again
+            # Create a new response so FastAPI can send it again
             new_response = Response(
                 content=response_body,
                 status_code=response.status_code,
@@ -38,9 +45,20 @@ class LoggingMiddleware(BaseHTTPMiddleware):
                 media_type=response.media_type
             )
 
-            self.logger.info(f"[RESPONSE] {request.method} {request.url} - {response.status_code} - {response_body.decode('utf-8')}")
+            try:
+                decoded_body = response_body.decode("utf-8")
+            except UnicodeDecodeError:
+                decoded_body = "<BINARY DATA>"
+
+            self.logger.info(
+                f"[RESPONSE] {request.method} {request.url} - "
+                f"{response.status_code} - {decoded_body}"
+            )
+
             return new_response
+
         except Exception as e:
-            # Log the exception but DO NOT suppress it
-            self.logger.error(f"[MIDDLEWARE] Exception in request: {e}\n{traceback.format_exc()}")
-            raise Exception(f"Error {e}")
+            self.logger.error(
+                f"[MIDDLEWARE] Exception in request: {e}\n{traceback.format_exc()}"
+            )
+            raise

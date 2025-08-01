@@ -40,12 +40,38 @@ class UserService(BaseService):
                 detail="An unexpected error occurred while creating the user",
             )
 
+    # Find a user by ID
+    async def find_user_by_id(self, user_id: str) -> Optional[dict]:
+        try:
+            user = await self.db.users.find_one(
+                {"_id": ObjectId(user_id)},
+                {"_id": 0, "firstname": 1, "lastname": 1, "email": 1, "is_active": 1},
+            )
+            if not user:
+                self.logger.warning("User not found for ID %s", user_id)
+                raise HTTPException(status_code=404, detail="User not found")
+
+            self.logger.info("Fetched user profile for ID %s", user_id)
+            return user
+        except PyMongoError as e:
+            self.logger.error("Error in %s for ID %s: %s", "find_user_by_id", user_id, e)
+            raise HTTPException(status_code=500, detail="Could not fetch user data")
+        except bson_errors.InvalidId:
+            self.logger.warning("Invalid user ID provided: %s", user_id)
+            raise HTTPException(status_code=400, detail="Invalid user ID")
+        except Exception as e:
+            self.logger.error("Error in %s for ID %s: %s", "find_user_by_id", user_id, e)
+            raise HTTPException(
+                status_code=500,
+                detail="An unexpected error occurred while fetching user data",
+            )
+
     # List of active users
     async def list_users(self) -> list:
         try:
             users = self.db.users.find(
                 {"is_active": True},
-                {"_id": 0, "firstname": 1, "lastname": 1, "email": 1},
+                {"_id": 0, "firstname": 1, "lastname": 1, "email": 1, "is_active": 1},
             )
             result = await users.to_list(length=None)
 
@@ -66,7 +92,7 @@ class UserService(BaseService):
         try:
             user = await self.db.users.find_one(
                 {"email": email, "is_active": True},
-                {"_id": 1, "firstname": 1, "lastname": 1, "email": 1, "password_hash": 1},
+                {"_id": 1, "firstname": 1, "lastname": 1, "email": 1, "password_hash": 1, "is_verified": 1},
             )
             if not user:
                 self.logger.warning("User not found for email %s", email)
@@ -77,6 +103,7 @@ class UserService(BaseService):
                 "objectId": str(user["_id"]),
                 "email": user["email"],
                 "password_hash": str(user["password_hash"]),
+                "is_verified": user["is_verified"]
             }
         except PyMongoError as e:
             self.logger.error(
@@ -148,4 +175,33 @@ class UserService(BaseService):
             raise HTTPException(
                 status_code=500,
                 detail="An unexpected error occurred while updating user data",
+            )
+
+    # Find user by verification token
+    async def find_by_verification_token(self, token: str) -> Optional[dict]:
+        try:
+            user = await self.db.users.find_one(
+                {"verification_token": token, "is_active": True},
+                {"_id": 1, "email": 1, "is_verified": 1},
+            )
+            if not user:
+                self.logger.warning("User not found for verification token: %s", token)
+                return None
+
+            self.logger.info("Found user for verification token: %s", token)
+            return {
+                "_id": str(user["_id"])
+            }
+        except PyMongoError as e:
+            self.logger.error(
+                "Error in %s for token %s: %s", "find_by_verification_token", token, e
+            )
+            raise HTTPException(status_code=500, detail="Could not fetch user data")
+        except Exception as e:
+            self.logger.error(
+                "Error in %s for token %s: %s", "find_by_verification_token", token, e
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="An unexpected error occurred while fetching user data",
             )

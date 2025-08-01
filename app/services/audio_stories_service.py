@@ -142,14 +142,25 @@ class AudioStoriesService(BaseService):
                 {"_id": 1, "meta_details": 1}
             ).sort("created_at", -1)
 
-            if not stories_cursor:
+            stories = await stories_cursor.to_list(length=None)
+
+            if not stories:
                 self.logger.warning("No audio story found for channel ID %s", channel_id)
                 raise HTTPException(status_code=404, detail="Audio story not found")
 
-            stories = await stories_cursor.to_list(length=None)
+            # Convert ObjectId to str
+            for story in stories:
+                story["channel_id"] = str(story["_id"])
+
             return stories
+
         except Exception as e:
-            self.logger.error("Error in %s for channel %s: %s", "get_audio_story_by_channel_id", channel_id, e)
+            self.logger.error(
+                "Error in %s for channel %s: %s",
+                "get_audio_story_by_channel_id",
+                channel_id,
+                e
+            )
             raise HTTPException(status_code=500, detail="Could not fetch audio story data")
 
     # Get audio story file by ID

@@ -36,7 +36,7 @@ class ChannelService(BaseService):
     async def find_channel_by_id(self, channel_id: str) -> Optional[dict]:
         try:
             channel = await self.db.channels.find_one(
-                {"_id": ObjectId(channel_id), "is_active": True},
+                {"_id": ObjectId(channel_id)},
                 {
                     "_id": 1,
                     "youtube_channel_id": 1,

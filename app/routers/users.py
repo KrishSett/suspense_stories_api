@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import FileResponse
 from typing import List, Dict, Any
 from auth.dependencies import JWTAuthGuard
-from app.models import ChannelActiveList
+from app.models import ChannelActiveList, AudioStoryList
 from app.services import AdminService, UserService, ChannelService, AudioStoriesService
 from common import RedisHashCache
 from config import config
@@ -10,9 +10,7 @@ from utils.helpers import generate_signed_url, decode_signed_url_token
 from jose import jwt, JWTError
 import os
 
-
 userRouter = APIRouter(prefix="/users", tags=["users"])
-
 admin_service = AdminService()
 user_service = UserService()
 channel_service = ChannelService()
@@ -46,7 +44,7 @@ async def get_channels(current_user: dict = Depends(JWTAuthGuard("user"))):
         raise HTTPException(status_code=500, detail=str(e))
 
 # Get list of stories by channel ID
-@userRouter.get("/channels/{channel_id}/stories", response_model=List[Dict[str, Any]])
+@userRouter.get("/channels/{channel_id}/stories", response_model=List[AudioStoryList])
 async def list_stories(channel_id: str, current_user: dict = Depends(JWTAuthGuard("user"))):
     stories = await audio_stories_service.get_audio_story_by_channel_id(channel_id)
 
@@ -57,7 +55,13 @@ async def list_stories(channel_id: str, current_user: dict = Depends(JWTAuthGuar
 
 # Get audio file path for a specific story
 @userRouter.get("/stories-audio/{story_id}")
-async def fetch_audio(story_id: str):
+async def fetch_audio(story_id: str, current_user: dict = Depends(JWTAuthGuard("user"))):
+    if not story_id:
+        raise HTTPException(status_code=400, detail="Story ID is required")
+    if not story_id.isalnum():
+        raise HTTPException(status_code=400, detail="Invalid Story ID format")
+
+    # Fetch the audio story by ID
     story = await audio_stories_service.get_audio_story_by_id(story_id)
     if not story:
         raise HTTPException(status_code=404, detail="Audio story not found")
@@ -66,8 +70,12 @@ async def fetch_audio(story_id: str):
 
     return {"signed_url": signed_url, "expires_in": 86400}
 
+# Download audio file by filename
 @userRouter.get("/audio-download/{filename}")
 async def audio_download(filename: str, token: str = Query(...)):
+    if not token:
+        raise HTTPException(status_code=400, detail="Token is required")
+
     try:
         payload = decode_signed_url_token(token)
 

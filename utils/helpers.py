@@ -43,9 +43,7 @@ def decode_signed_url_token(token: str) -> dict:
             algorithms=[config.get("algorithm", "HS256")]
         )
         return payload
-
     except ExpiredSignatureError:
         raise HTTPException(status_code=403, detail="URL expired")
-
     except JWTError:
         raise HTTPException(status_code=403, detail="Invalid token")

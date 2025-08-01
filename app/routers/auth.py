@@ -3,6 +3,10 @@ from app.models import LoginRequest, SignupRequest, TokenRefreshRequest, AccessT
 from common.access_tokens import AccessTokenManager
 from common.password_utils import PasswordHasher
 from app.services import AdminService, UserService
+from config import config
+from common import RedisHashCache
+from utils.helpers import process_cache_key
+import uuid
 
 authRouter = APIRouter(
     prefix="/auth",
@@ -15,6 +19,7 @@ access_token_manager = AccessTokenManager()
 password_hash = PasswordHasher()
 admin_service = AdminService()
 user_service = UserService()
+cache = RedisHashCache(prefix=config["cache_prefix"])
 
 # Admin login endpoint
 @authRouter.post("/admin", response_model=AccessTokenResponse)
@@ -54,6 +59,8 @@ async def user_signup(data: SignupRequest):
             "is_active": True,
             "favorite_channels": [],
             "playlist": [],
+            "is_verified": False,
+            "verification_token": str(uuid.uuid4()),
             "created_at": None,
             "updated_at": None
         }
@@ -65,11 +72,35 @@ async def user_signup(data: SignupRequest):
 
         # Create access and refresh tokens for the new user
         token_response = await access_token_manager.generate_tokens(user_id=created_user["objectId"], user_email=created_user["email"], role="user")
+
+        if not token_response:
+            raise HTTPException(status_code=500, detail="Could not generate tokens")
+        else:
+            # Delete cache for active channels
+            key = "admin_key"
+            cache_key = process_cache_key(key)
+            await cache.h_del(cache_key, "list_users")
+
         return token_response
     except HTTPException:
         raise
     except Exception:
         raise HTTPException(status_code=500, detail="Internal Server Error")
+
+# Email verification endpoint
+@authRouter.get("/verify-email/{token}")
+async def verify_email(token: str):
+    user = await user_service.find_by_verification_token(token)
+
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+
+    await user_service.update_user(
+        user_id=user["_id"],
+        update_data={"is_verified": True, "verification_token": None}
+    )
+
+    return {"message": "Email verified successfully"}
 
 # User login  endpoint
 @authRouter.post("/user", response_model=AccessTokenResponse)
@@ -80,8 +111,13 @@ async def user_login(data: LoginRequest):
 
         user = await user_service.find_user_with_email(data.email)
 
+        # Check if user exists and password matches
         if not user or not password_hash.verify(data.password, user["password_hash"]):
             raise HTTPException(status_code=401, detail="Invalid credentials")
+
+        # Check if user email is verified
+        if not user["is_verified"]:
+            raise HTTPException(status_code=403, detail="Email not verified")
 
         # Create access and refresh tokens for the user
         token_response = await access_token_manager.generate_tokens(user_id=user["objectId"], user_email=user["email"], role="user")
@@ -90,6 +126,8 @@ async def user_login(data: LoginRequest):
         raise
     except Exception:
         raise HTTPException(status_code=500, detail="Internal Server Error")
+
+
 
 # Refresh token endpoint
 @authRouter.post("/token/refresh", response_model=RefreshTokenResponse)

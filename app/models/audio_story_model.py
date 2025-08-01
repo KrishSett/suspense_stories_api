@@ -1,6 +1,10 @@
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
-from .base_model import MongoBaseModel, PyObjectId
+
+# Audio story base model
+class AudioStoryBase(BaseModel):
+    channel_id: str
+    meta_details: Optional[Dict] = None
 
 # Input model for creating
 class AudioStoryCreate(BaseModel):
@@ -14,7 +18,7 @@ class AudioStoryQueuedResponse(BaseModel):
     status: str = "queued"
 
 # Full DB model base
-class AudioStoryDB(MongoBaseModel):
+class AudioStoryDB(BaseModel):
     channel_id: str
     file_path: str
     file_name: Optional[str] = None
@@ -25,6 +29,5 @@ class AudioStoryDB(MongoBaseModel):
     is_ready: Optional[bool] = False
     meta_details: Optional[Dict[str, Any]] = None
 
-# For listing
-class AudioStoryList(AudioStoryDB):
-    id: PyObjectId = Field(alias="_id")
+class AudioStoryList(AudioStoryBase):
+    pass

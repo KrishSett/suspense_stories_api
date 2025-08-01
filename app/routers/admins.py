@@ -3,9 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from typing import List
 import uuid
 from auth.dependencies import JWTAuthGuard
-from app.models import AdminList
-from app.models import ChannelList, ChannelCreate, ChannelUpdate, ChannelResponse, ChannelSetOrder, ChannelActiveList, ChannelView
-from app.models.audio_story_model import AudioStoryCreate, AudioStoryQueuedResponse
+from app.models import AdminList, UserList, ChannelList, ChannelCreate, ChannelUpdate, ChannelResponse, ChannelSetOrder, ChannelActiveList, ChannelView, AudioStoryCreate, AudioStoryQueuedResponse
 from app.services import AdminService, UserService, ChannelService, AudioStoriesService
 from app.jobs import download_audio_and_get_info
 from common import RedisHashCache
@@ -92,37 +90,38 @@ async def create_channel(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Deactivate a channel
-@adminRouter.post("/channel-deactivate/{channel_id}", response_model=ChannelResponse)
-async def deactivate_channel(channel_id: str, current_user: dict = Depends(JWTAuthGuard("admin"))):
+# Update channel status (activate/deactivate)
+@adminRouter.post("/channel/update-status/{channel_id}", response_model=ChannelResponse)
+async def update_channel_status(
+    channel_id: str,
+    current_user: dict = Depends(JWTAuthGuard("admin"))
+):
     try:
-        updated = await channel_service.update_channel(channel_id, {"is_active": False})
-        if not updated:
+        # Find channel first
+        channel = await channel_service.find_channel_by_id(channel_id)
+        if not channel:
             raise HTTPException(status_code=404, detail="Channel not found.")
+
+        # Toggle the status
+        new_status = not channel.get("is_active", False)
+
+        updated = await channel_service.update_channel(channel_id, {"is_active": new_status})
+        if not updated:
+            raise HTTPException(status_code=500, detail="Failed to update channel status.")
 
         # Delete cache for active channels
         key = current_user["role"] + "_key"
         cache_key = process_cache_key(key)
         await cache.h_del(cache_key, "list_active_channels")
-        return {"status": True, "detail": "Channel deactivated successfully."}
+
+        return {
+            "status": True,
+            "detail": f"Channel {'activated' if new_status else 'deactivated'} successfully."
+        }
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Activate a channel
-@adminRouter.post("/channel-activate/{channel_id}", response_model=ChannelResponse)
-async def activate_channel(channel_id: str, current_user: dict = Depends(JWTAuthGuard("admin"))):
-    try:
-        updated = await channel_service.update_channel(channel_id, {"is_active": True})
-        if not updated:
-            raise HTTPException(status_code=404, detail="Channel not found.")
-
-        # Delete cache for active channels
-        key = current_user["role"] + "_key"
-        cache_key = process_cache_key(key)
-        await cache.h_del(cache_key, "list_active_channels")
-        return {"status": True, "detail": "Channel activated successfully."}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 # Set the order of a channel
 @adminRouter.post("/channel-set-order", response_model=ChannelResponse)
@@ -263,25 +262,51 @@ async def delete_audio_story(story_id: str, current_user: dict = Depends(JWTAuth
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
-# Deactivate a user
-@adminRouter.post("/user-deactivate/{user_id}")
-async def deactivate_user(user_id: str, current_user: dict = Depends(JWTAuthGuard("admin"))):
+# Update user status (activate/deactivate)
+@adminRouter.post("/user/update-status/{user_id}", response_model=ChannelResponse)
+async def update_user_status(
+    user_id: str,
+    current_user: dict = Depends(JWTAuthGuard("admin"))
+):
     try:
-        updated = await user_service.update_user(user_id=user_id, update_data={"is_active": False})
-        if not updated:
+        # Find user first
+        user = await user_service.find_user_by_id(user_id)
+        if not user:
             raise HTTPException(status_code=404, detail="User not found.")
-        return {"detail": "User deactivated successfully."}
+
+        # Toggle the status
+        new_status = not user.get("is_active", False)
+
+        updated = await user_service.update_user(
+            user_id=user_id,
+            update_data={"is_active": new_status}
+        )
+        if not updated:
+            raise HTTPException(status_code=500, detail="Failed to update user status.")
+
+        return {"detail": f"User {'activated' if new_status else 'deactivated'} successfully."}
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Activate a user
-@adminRouter.post("/user-activate/{user_id}")
-async def deactivate_user(user_id: str, current_user: dict = Depends(JWTAuthGuard("admin"))):
+# Users list
+@adminRouter.get("/user/list", response_model=List[UserList])
+async def list_users(current_user: dict = Depends(JWTAuthGuard("admin"))):
     try:
-        updated = await user_service.update_user(user_id=user_id, update_data={"is_active": True})
-        if not updated:
-            raise HTTPException(status_code=404, detail="User not found.")
-        return {"detail": "User activated successfully."}
+        key = current_user["role"] + "_key"
+        cache_key = process_cache_key(key)
+
+        # Check cache
+        cached_users = await cache.h_get(cache_key, "list_users")
+        if cached_users is not None:
+            return cached_users
+
+        users = await user_service.list_users()
+        if not users:
+            raise HTTPException(status_code=404, detail="No users found.")
+
+        # Cache the list of users
+        await cache.h_set(cache_key, "list_users", jsonable_encoder(users))
+        return users
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
