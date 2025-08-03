@@ -9,13 +9,12 @@
 - Channel specific story listings
 - Motor to use async await functions
 - JWT authentication for dual auth guard
-- Usage of FastAPI background jobs
+- Usage of FastAPI background jobs for story processing
 - Redis caching mongo query cache
 - Email notification on new stories published
+- Pagination support for list pages (Channel, Story, Users, Admins)
 
 ### Future Implementations
-- Pagination support for list pages (Channel, Story)
 - Rate limiting for API endpoints
 - Search functionality for stories
-- Threading for story processing
 - HTML email templates for notifications

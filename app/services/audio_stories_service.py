@@ -59,10 +59,15 @@ class AudioStoriesService(BaseService):
                 detail="An unexpected error occurred while creating the audio story",
             )
 
-    # Delete an audio story by ID
-    async def delete_audio_story(self, story_id: str) -> bool:
+    # Delete an audio story
+    async def delete_audio_story(self, channel_id: str, story_id: str) -> bool:
         try:
-            result = await self.db.audio_stories.delete_one({"_id": ObjectId(story_id)})
+            result = await self.db.audio_stories.delete_one(
+                {
+                    "_id": ObjectId(story_id),
+                    "channel_id": ObjectId(channel_id),
+                }
+            )
             if result.deleted_count == 0:
                 self.logger.warning("No audio story found to delete for ID %s", story_id)
                 raise HTTPException(status_code=404, detail="Audio story not found")
@@ -134,32 +139,59 @@ class AudioStoriesService(BaseService):
             )
             raise HTTPException(status_code=500, detail="Could not update audio story as ready")
 
-    # Get audio story by channel ID
-    async def get_audio_story_by_channel_id(self, channel_id: str) -> Optional[dict]:
+    # Get audio stories by channel ID with pagination
+    async def get_audio_story_by_channel_id(self, channel_id: str, page: int = 1, page_size: int = 10) -> Optional[dict]:
         try:
-            stories_cursor = self.db.audio_stories.find(
-                {"channel_id": channel_id, "is_ready": True},
-                {"_id": 1, "meta_details": 1}
-            ).sort("created_at", -1)
+            skip = (page - 1) * page_size
 
-            stories = await stories_cursor.to_list(length=None)
+            query = {"channel_id": channel_id, "is_ready": True}
+            projection = {"_id": 1, "meta_details": 1, "created_at": 1}
 
-            if not stories:
-                self.logger.warning("No audio story found for channel ID %s", channel_id)
+            # Count total matching stories
+            total_stories = await self.db.audio_stories.count_documents(query)
+
+            # Fetch paginated results sorted by created_at DESC
+            cursor = (
+                self.db.audio_stories
+                .find(query, projection)
+                .sort("created_at", -1)
+                .skip(skip)
+                .limit(page_size)
+            )
+
+            result = await cursor.to_list(length=page_size)
+
+            if not result:
+                self.logger.warning("No audio stories found for channel ID %s", channel_id)
                 raise HTTPException(status_code=404, detail="Audio story not found")
 
-            # Convert ObjectId to str
-            for story in stories:
-                story["channel_id"] = str(story["_id"])
+            # Convert ObjectId to str and format response
+            stories = [
+                {
+                    "story_id": str(story["_id"]),
+                    "channel_id": str(story.get("channel_id", channel_id)),
+                    "meta_details": story.get("meta_details", {})
+                }
+                for story in result
+            ]
 
-            return stories
+            self.logger.info(
+                "Fetched %d stories for channel %s (page %d, page_size %d)",
+                len(stories), channel_id, page, page_size
+            )
+
+            return {
+                "total": total_stories,
+                "page": page,
+                "page_size": page_size,
+                "total_pages": (total_stories + page_size - 1) // page_size,
+                "data": stories
+            }
 
         except Exception as e:
             self.logger.error(
-                "Error in %s for channel %s: %s",
-                "get_audio_story_by_channel_id",
-                channel_id,
-                e
+                "Error in get_audio_story_by_channel_id for channel %s: %s",
+                channel_id, e
             )
             raise HTTPException(status_code=500, detail="Could not fetch audio story data")
 

@@ -5,20 +5,26 @@ from jose import jwt, JWTError, ExpiredSignatureError
 from config import config
 from fastapi import HTTPException
 
+# Get current ISO timestamp in UTC
 def get_current_iso_timestamp() -> datetime:
     return datetime.now(timezone.utc)
 
+# Generate a unique identifier (UUID)
 def generate_unique_id() -> str:
     import uuid
     return str(uuid.uuid4())
 
-def process_cache_key(key: str):
+# Process cache key to ensure it is safe for use
+def process_cache_key():
+    key = config.get("cache_key", "app_key")
     return key.lower().replace(" ", "_").replace("-", "_")
 
+# Sanitize filename to remove unsafe characters
 def sanitize_filename(filename: str) -> str:
     # remove ../ and special chars for safety
     return re.sub(r"[^a-zA-Z0-9_\-.]", "", filename)
 
+# Generate a signed URL for downloading audio files
 def generate_signed_url(filename: str, expiry_seconds: int = 86400) -> str:
     safe_filename = sanitize_filename(filename)
 
@@ -35,6 +41,7 @@ def generate_signed_url(filename: str, expiry_seconds: int = 86400) -> str:
 
     return f"{base_url}users/audio-download/{safe_filename}?token={token}"
 
+# Decode a signed URL token to retrieve the filename and expiration
 def decode_signed_url_token(token: str) -> dict:
     try:
         payload = jwt.decode(

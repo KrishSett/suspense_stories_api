@@ -10,24 +10,56 @@ class ChannelService(BaseService):
     def __init__(self):
         super().__init__()
 
-    # List all active channels
-    async def list_active_channels(self) -> Optional[list]:
+    # List active channels with pagination
+    async def list_active_channels(self, page: int = 1, page_size: int = 10) -> Optional[dict]:
         try:
-            channels = self.db.channels.find(
-                {"is_active": True},
-                {
-                    "_id": 1,
-                    "youtube_channel_id": 1,
-                    "title": 1,
-                    "order_position": 1,
-                    "thumbnail_url": 1,
-                    "description": 1
-                }
+            skip = (page - 1) * page_size
+
+            query = {"is_active": True}
+            projection = {
+                "_id": 1,
+                "youtube_channel_id": 1,
+                "title": 1,
+                "order_position": 1,
+                "thumbnail_url": 1,
+                "description": 1
+            }
+
+            # Count total documents
+            total_channels = await self.db.channels.count_documents(query)
+
+            # Fetch paginated results
+            cursor = (self.db.channels.find(query, projection)
+                      .sort("order_position", 1)
+                      .skip(skip)
+                      .limit(page_size))
+            result = await cursor.to_list(length=page_size)
+
+            channels = []
+            for ch in result:
+                channels.append({
+                    "channel_id": str(ch["_id"]),
+                    "youtube_channel_id": ch["youtube_channel_id"],
+                    "title": ch["title"],
+                    "is_active": ch.get("is_active", True),
+                    "order_position": ch["order_position"],
+                    "description": ch.get("description") or "No description available",
+                    "thumbnail_url": ch.get("thumbnail_url") or "https://example.com/default_thumbnail.png",
+                    "status": True
+                })
+
+            self.logger.info(
+                "Fetched %d active channels (page %d, page_size %d)", len(channels), page, page_size
             )
 
-            result = await channels.to_list(length=None)
-            self.logger.info("Fetched %d active channels", len(result))
-            return result
+            return {
+                "total": total_channels,
+                "page": page,
+                "page_size": page_size,
+                "total_pages": (total_channels + page_size - 1) // page_size,
+                "data": channels
+            }
+
         except PyMongoError as e:
             self.logger.error("Error in %s: %s", "list_active_channels", e)
             raise HTTPException(status_code=500, detail="Could not fetch channel data")

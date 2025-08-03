@@ -85,9 +85,8 @@ async def user_signup(data: SignupRequest, background_tasks: BackgroundTasks):
             raise HTTPException(status_code=500, detail="Could not generate tokens")
         else:
             # Delete cache for active channels
-            key = "admin_key"
-            cache_key = process_cache_key(key)
-            await cache.h_del(cache_key, "list_users")
+            cache_key = process_cache_key()
+            await cache.h_del_wildcard(cache_key, "list_users")
 
         return token_response
     except HTTPException:

@@ -83,5 +83,6 @@ config = {
     "redis_host": redis_host,
     "redis_port": redis_port,
     "redis_db": redis_db,
-    "cache_prefix": cache_prefix
+    "cache_prefix": cache_prefix,
+    "cache_key": f"{app_name}_app_data"
 }

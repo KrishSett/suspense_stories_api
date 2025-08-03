@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 # Audio story base model
 class AudioStoryBase(BaseModel):
@@ -29,5 +29,15 @@ class AudioStoryDB(BaseModel):
     is_ready: Optional[bool] = False
     meta_details: Optional[Dict[str, Any]] = None
 
+# Model for audio story list
 class AudioStoryList(AudioStoryBase):
-    pass
+    story_id: str
+
+# Model for paginated response of audio stories
+class PaginatedAudioResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+    channel: Optional[Dict[str, Any]] = None
+    data: List[AudioStoryList]

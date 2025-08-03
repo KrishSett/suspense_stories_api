@@ -66,22 +66,51 @@ class UserService(BaseService):
                 detail="An unexpected error occurred while fetching user data",
             )
 
-    # List of active users
-    async def list_users(self) -> list:
+    # List of active users with pagination
+    async def list_users(self, page: int = 1, page_size: int = 10) -> dict:
         try:
-            users = self.db.users.find(
-                {"is_active": True},
-                {"_id": 0, "firstname": 1, "lastname": 1, "email": 1, "is_active": 1},
-            )
-            result = await users.to_list(length=None)
+            skip = (page - 1) * page_size
 
-            self.logger.info("Fetched %d active users", len(result))
-            return result
+            query = {"is_active": True}
+            projection = {
+                "_id": 0,
+                "firstname": 1,
+                "lastname": 1,
+                "email": 1,
+                "is_active": 1,
+            }
+
+            # Count total matching users
+            total_users = await self.db.users.count_documents(query)
+
+            # Fetch paginated users
+            cursor = (
+                self.db.users.find(query, projection)
+                .sort("created_at", -1)  # Sort by created_at DESC
+                .skip(skip)
+                .limit(page_size)
+            )
+
+            result = await cursor.to_list(length=page_size)
+
+            self.logger.info(
+                "Fetched %d active users (page %d, page_size %d)",
+                len(result), page, page_size
+            )
+
+            return {
+                "total": total_users,
+                "page": page,
+                "page_size": page_size,
+                "total_pages": (total_users + page_size - 1) // page_size,
+                "data": result
+            }
+
         except PyMongoError as e:
-            self.logger.error("Error in %s: %s", "list_users", e)
+            self.logger.error("Error in list_users: %s", e)
             raise HTTPException(status_code=500, detail="Could not fetch users data")
         except Exception as e:
-            self.logger.error("Error in %s: %s", "list_users", e)
+            self.logger.error("Error in list_users: %s", e)
             raise HTTPException(
                 status_code=500,
                 detail="An unexpected error occurred while fetching users data",

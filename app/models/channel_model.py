@@ -1,6 +1,6 @@
 # channel_model.py
 from pydantic import BaseModel, constr
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 # Base model for shared fields
@@ -48,3 +48,11 @@ class ChannelResponse(BaseModel):
 class ChannelSetOrder(BaseModel):
     channel_id: str
     order_position: int
+
+# Model for paginated response of channels
+class PaginatedChannelsResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+    data: List[ChannelActiveList]
