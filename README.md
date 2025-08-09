@@ -13,8 +13,8 @@
 - Redis caching mongo query cache
 - Email notification on new stories published
 - Pagination support for list pages (Channel, Story, Users, Admins)
+- HTML email templates for notifications
 
 ### Future Implementations
 - Rate limiting for API endpoints
 - Search functionality for stories
-- HTML email templates for notifications
