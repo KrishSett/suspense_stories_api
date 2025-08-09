@@ -18,7 +18,7 @@ class NotificationSender(ABC):
             msg["Subject"] = subject
             msg["From"] = self.mail_from
             msg["To"] = to_email
-            msg.set_content(body)
+            msg.add_alternative(body, subtype='html')
 
             with smtplib.SMTP(self.mail_host, self.mail_port) as smtp:
                 smtp.login(self.mail_user, self.mail_pass)

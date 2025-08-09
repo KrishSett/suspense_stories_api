@@ -1,13 +1,15 @@
+# users.py
 from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import FileResponse
 from typing import List, Dict, Any
 from auth.dependencies import JWTAuthGuard
-from app.models import ChannelActiveList, PaginatedAudioResponse, PaginatedChannelsResponse
+from app.models import PlaylistCreate, PlaylistCreateResponse, PaginatedAudioResponse, PaginatedChannelsResponse, FavoriteChannel, UserResponse
 from app.services import AdminService, UserService, ChannelService, AudioStoriesService
 from common import RedisHashCache
 from config import config
-from utils.helpers import generate_signed_url, decode_signed_url_token, process_cache_key
+from utils.helpers import generate_signed_url, decode_signed_url_token, process_cache_key, generate_unique_id
 from jose import jwt, JWTError
+from bson import ObjectId, errors as bson_errors
 import os
 
 userRouter = APIRouter(prefix="/users", tags=["users"])
@@ -124,3 +126,62 @@ async def audio_download(filename: str, token: str = Query(...)):
         raise HTTPException(status_code=404, detail="File not found")
 
     return FileResponse(file_path, media_type="audio/mpeg")
+
+# Update playlist
+@userRouter.post("/channel/update-favourite", response_model=UserResponse)
+async def update_favorite_channel(
+        data: FavoriteChannel,
+        current_user: dict = Depends(JWTAuthGuard("user"))
+):
+    try:
+        user = await user_service.get_user_details_by_id(current_user.get("id"))
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        channel = await channel_service.find_channel_by_id(data.channel_id)
+        if not channel or not channel.get("is_active", True):
+            raise HTTPException(status_code=404, detail="Channel not found")
+
+        set_favorite = True if ObjectId(data.channel_id) not in user.get("favorite_channels") else False
+
+        # Update the favorite channel logic here
+        updated_channel = await user_service.update_favourite_status(current_user.get("id"), data.channel_id, set_favorite)
+
+        if not updated_channel:
+            raise HTTPException(status_code=500, detail="Failed to update favorite channel")
+
+        return updated_channel
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Create a new playlist
+@userRouter.post("/manage/playlists", response_model=PlaylistCreateResponse)
+async def create_playlist(data: PlaylistCreate, current_user: dict = Depends(JWTAuthGuard("user"))):
+    try:
+        user = await user_service.get_user_details_by_id(current_user.get("id"))
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        if not len(data.videos):
+            raise HTTPException(status_code=400, detail="Playlist must contain at least one video")
+
+        try:
+            videos = [ObjectId(v) for v in data.videos]
+        except bson_errors.InvalidId:
+            raise HTTPException(status_code=400, detail="Invalid video ID format")
+
+        playlist_attributes = {
+            "playlist_id": str(generate_unique_id()),
+            "name": data.name,
+            "videos": videos
+        }
+
+        # Create the playlist logic here
+        result  = await user_service.create_playlist(current_user.get("id"), playlist_attributes)
+
+        if not result :
+            raise HTTPException(status_code=500, detail="Failed to create playlist")
+
+        return {"status": True, "detail": "Playlist created successfully", "playlist_id": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

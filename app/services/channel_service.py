@@ -182,4 +182,3 @@ class ChannelService(BaseService):
             raise HTTPException(status_code=400, detail="Invalid channel ID")
         except PyMongoError as e:
             raise HTTPException(status_code=500, detail="Could not update channel order position")
-
