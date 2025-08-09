@@ -7,18 +7,31 @@ class EmailVerificationNotification(NotificationSender):
 
         subject = f"Verify Your Email - {config['app_name']}"
         body = f"""
-Hi,
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.5; color: #333;">
+  <p>Hi,</p>
 
-Welcome to {config['app_name']}! Please verify your email address to activate your account.
+  <p>Welcome to <strong>{config['app_name']}</strong>! Please verify your email address to activate your account.</p>
 
-Click the link below to verify your email:
-{verify_url}
+  <p>
+    <a href="{verify_url}" 
+       style="display:inline-block; padding:10px 20px; background-color:#1a73e8; color:#fff; text-decoration:none; border-radius:4px;">
+       Verify Email
+    </a>
+  </p>
 
-If the above link doesn't work, copy and paste it into your browser.
+  <p>If the above button doesn't work, copy and paste this link into your browser:</p>
+  <p style="word-break:break-all; color:#1a73e8;">{verify_url}</p>
 
-This link will expire in 24 hours. If you did not sign up for {config['app_name']}, please ignore this email.
+  <p>This link will expire in 24 hours. If you did not sign up for {config['app_name']}, please ignore this email.</p>
 
-Thank you,
-Team {config['app_name']}
+  <p>Thank you,<br>
+  Team {config['app_name']}</p>
+</body>
+</html>
 """
         await self.send_email(to_email=to_email, subject=subject, body=body)

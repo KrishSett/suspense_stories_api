@@ -1,7 +1,7 @@
 # user_model.py
 from typing import Optional, Dict, Any, List
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, constr
 
 # Base user model
 class UserBase(BaseModel):
@@ -21,3 +21,25 @@ class PaginatedUserResponse(BaseModel):
     total_pages: int
     channel: Optional[Dict[str, Any]] = None
     data: List[UserList]
+
+# Model for updating user favorite channel
+class FavoriteChannel(BaseModel):
+    channel_id: str
+
+# Basic response
+class UserResponse(BaseModel):
+    status: bool = True
+    detail: str
+
+# Model for creating a playlist
+class PlaylistCreate(BaseModel):
+    name: constr(
+        strip_whitespace=True,
+        min_length=3,
+        max_length=50,
+        pattern=r"^[\w\s\-]+$"
+    )
+    videos: List
+
+class PlaylistCreateResponse(UserResponse):
+    playlist_id: str

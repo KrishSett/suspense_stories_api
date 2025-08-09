@@ -149,11 +149,11 @@ class UserService(BaseService):
             )
 
     # Get user profile by ID
-    async def get_user_by_id(self, user_id: str) -> Optional[dict]:
+    async def get_user_details_by_id(self, user_id: str) -> Optional[dict]:
         try:
             user = await self.db.users.find_one(
                 {"_id": ObjectId(user_id), "is_active": True},
-                {"_id": 0, "firstname": 1, "lastname": 1, "email": 1},
+                {"_id": 0, "firstname": 1, "lastname": 1, "email": 1, "phone": 1, "favorite_channels": 1, "playlist": 1},
             )
             if not user:
                 self.logger.warning("User not found for ID %s", user_id)
@@ -234,3 +234,63 @@ class UserService(BaseService):
                 status_code=500,
                 detail="An unexpected error occurred while fetching user data",
             )
+
+    # Update favourite status of a channel
+    async def update_favourite_status(self, user_id: str, channel_id: str, is_favourite: bool) -> Optional[dict]:
+        try:
+
+            if is_favourite:
+                result = await self.db.users.update_one(
+                    {"_id": ObjectId(user_id)},
+                    {
+                        "$push": {"favorite_channels": ObjectId(channel_id)},
+                        "$set": {"updated_at": get_current_iso_timestamp()}
+                    }
+                )
+            else:
+                result = await self.db.users.update_one(
+                    {"_id": ObjectId(user_id)},
+                    {
+                        "$pull": {"favorite_channels": ObjectId(channel_id)},
+                        "$set": {"updated_at": get_current_iso_timestamp()}
+                    }
+                )
+
+            if result.modified_count == 0:
+                self.logger.warning("No changes made for channel ID %s", channel_id)
+                raise HTTPException(status_code=404, detail="Channel not found or no changes made")
+
+            self.logger.info("Favourite status updated for channel ID %s", channel_id)
+            return {"status": True, "detail": "Favourite status updated successfully"}
+        except bson_errors.InvalidId:
+            self.logger.warning("Invalid channel ID for favourite update: %s", channel_id)
+            raise HTTPException(status_code=400, detail="Invalid channel ID")
+        except PyMongoError as e:
+            self.logger.error("Error in %s for ID %s: %s", "update_favourite_status", channel_id, e)
+            raise HTTPException(status_code=500, detail="Could not update favourite status")
+
+    # Create a new playlist for a user
+    async def create_playlist(self, user_id: str, playlist_data: dict) -> str:
+        try:
+            try:
+                user_obj_id = ObjectId(user_id)
+            except Exception:
+                raise HTTPException(status_code=400, detail="Invalid user ID")
+
+            result = await self.db.users.update_one(
+                {"_id": user_obj_id},
+                {
+                    "$push": {"playlists": playlist_data},
+                    "$set": {"updated_at": get_current_iso_timestamp()}
+                }
+            )
+
+            if result.modified_count == 0:
+                self.logger.warning("Playlist not created for user %s", user_id)
+                raise HTTPException(status_code=404, detail="User not found")
+
+            self.logger.info("Playlist '%s' created for user %s", playlist_data.get("name", "Playlist"), user_id)
+            return playlist_data.get("playlist_id")
+        except PyMongoError as e:
+            self.logger.error("Error creating playlist for user %s: %s", user_id, e)
+            raise HTTPException(status_code=500, detail="Could not create playlist")

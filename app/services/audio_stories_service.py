@@ -16,6 +16,7 @@ class AudioStoriesService(BaseService):
             data_dict = story_data
 
             try:
+                data_dict["channel_id"] = ObjectId(story_data["channel_id"])
                 data_dict["created_by"] = ObjectId(created_by)
             except bson_errors.InvalidId:
                 self.logger.warning("Invalid creator ID for audio story: %s", created_by)
@@ -92,7 +93,7 @@ class AudioStoriesService(BaseService):
     async def mark_ready(self, channel_id: str, file_path: str, meta_info: dict) -> bool:
         try:
             result = await self.db.audio_stories.update_one(
-                {"channel_id": channel_id, "file_path": file_path},
+                {"channel_id": ObjectId(channel_id), "file_path": file_path},
                 {
                     "$set": {
                         "is_ready": True,
