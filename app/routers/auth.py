@@ -63,7 +63,7 @@ async def user_signup(data: SignupRequest, background_tasks: BackgroundTasks):
             "role": "user",
             "is_active": True,
             "favorite_channels": [],
-            "playlist": [],
+            "playlists": [],
             "is_verified": False,
             "verification_token": verification_token,
             "created_at": None,
