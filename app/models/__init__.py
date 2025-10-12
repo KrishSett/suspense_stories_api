@@ -4,3 +4,4 @@ from .auth_model import *
 from .channel_model import *
 from .audio_story_model import *
 from .user_model import *
+from .password_reset_model import *

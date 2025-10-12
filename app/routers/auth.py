@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks
-from app.models import LoginRequest, SignupRequest, TokenRefreshRequest, AccessTokenResponse, RefreshTokenResponse
+from app.models import LoginRequest, SignupRequest, TokenRefreshRequest, AccessTokenResponse, RefreshTokenResponse, ForgotPasswordRequest, PasswordResetRequest, PasswordResetResponse
 from common.access_tokens import AccessTokenManager
 from common.password_utils import PasswordHasher
-from app.services import AdminService, UserService
+from app.services import AdminService, UserService, PasswordResetService
 from config import config
 from common import RedisHashCache
 from utils.helpers import process_cache_key
@@ -20,6 +20,7 @@ access_token_manager = AccessTokenManager()
 password_hash = PasswordHasher()
 admin_service = AdminService()
 user_service = UserService()
+password_reset_service = PasswordResetService()
 cache = RedisHashCache(prefix=config["cache_prefix"])
 email_notification = EmailVerificationNotification()
 
@@ -134,9 +135,7 @@ async def user_login(data: LoginRequest):
     except Exception:
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
-
-
-# Refresh token endpoint
+# Refresh token endpoint (Admin and User both)
 @authRouter.post("/token/refresh", response_model=RefreshTokenResponse)
 async def refresh_token(data: TokenRefreshRequest):
     try:
@@ -147,3 +146,57 @@ async def refresh_token(data: TokenRefreshRequest):
         raise
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+
+# Forgot password endpoint (Admin and User both)
+@authRouter.post("/forgot-password", response_model=PasswordResetResponse)
+async def forgot_password(data: ForgotPasswordRequest):
+    try:
+        if data.type.lower() == 'admin':
+            resource = await admin_service.find_admin_with_email(data.email)
+        elif data.type.lower() == 'user':
+            resource = await user_service.find_user_with_email(data.email)
+        else:
+            raise HTTPException(status_code=400, detail="Invalid user type")
+
+        if not resource:
+            raise HTTPException(status_code=404, detail="Email not found")
+        reset_token = await password_reset_service.create_password_reset_token(resource_id=resource["objectId"], user_type=data.type.lower(), email=str(data.email))
+
+        if reset_token is not None:
+            return {
+                "success": True,
+                "message": "Password reset token created and sent to email (simulated).",
+                "result": {
+                    "token": reset_token,
+                    "email": resource["email"]
+                }  # In real application, do not return the token in response
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Could not create password reset token")
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid user details")
+
+# Reset password endpoint (Admin and User both)
+@authRouter.post("/reset-password", response_model=PasswordResetResponse)
+async def reset_password(data: PasswordResetRequest):
+    try:
+        if (data.new_password != data.confirm_password) or (len(data.new_password) < 6):
+            raise HTTPException(status_code=400, detail="Passwords do not match or are too short")
+
+        hashed_password = password_hash.hash(data.new_password)
+        reset_data = await password_reset_service.reset_password(reset_token=data.reset_token, new_password_hash=hashed_password)
+
+        if reset_data is None:
+            raise HTTPException(status_code=401, detail="Invalid or expired reset token")
+
+        return {
+            "success": True,
+            "message": "Password has been reset successfully.",
+            "result": reset_data
+        }
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=500, detail="Internal Server Error")

@@ -1,5 +1,5 @@
 #  helpers.py
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import time, uuid, re
 from jose import jwt, JWTError, ExpiredSignatureError
 from config import config
@@ -54,3 +54,13 @@ def decode_signed_url_token(token: str) -> dict:
         raise HTTPException(status_code=403, detail="URL expired")
     except JWTError:
         raise HTTPException(status_code=403, detail="Invalid token")
+
+def generate_verification_token() -> str:
+    import secrets
+    return secrets.token_urlsafe(32)
+
+from datetime import datetime, timedelta
+
+def generate_expiry_time(minutes: int = 5) -> str:
+    expiry_time = datetime.utcnow() + timedelta(minutes=minutes)
+    return expiry_time.isoformat()

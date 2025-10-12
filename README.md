@@ -18,3 +18,10 @@
 ### Future Implementations
 - Rate limiting for API endpoints
 - Search functionality for stories
+- Forget password functionality
+- Email template centralization with Placeholder Values
+
+# HOW TO SET UP
+- CONNECT WITH MONGODB
+- RUN REDIS CACHE
+- RUN FASTAPI

@@ -7,7 +7,6 @@ from app.services.base_service import BaseService
 from typing import Optional
 from utils.helpers import get_current_iso_timestamp
 
-
 class UserService(BaseService):
     def __init__(self):
         super().__init__()

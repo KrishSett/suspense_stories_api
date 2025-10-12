@@ -6,7 +6,6 @@ from bson import ObjectId, errors as bson_errors
 from app.services.base_service import BaseService
 from typing import Optional
 
-
 class AdminService(BaseService):
     def __init__(self):
         super().__init__()
