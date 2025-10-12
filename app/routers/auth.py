@@ -6,7 +6,7 @@ from app.services import AdminService, UserService, PasswordResetService
 from config import config
 from common import RedisHashCache
 from utils.helpers import process_cache_key
-from app.notifications import EmailVerificationNotification
+from app.notifications import EmailVerificationNotification, PasswordResetNotification
 import uuid
 
 authRouter = APIRouter(
@@ -23,6 +23,7 @@ user_service = UserService()
 password_reset_service = PasswordResetService()
 cache = RedisHashCache(prefix=config["cache_prefix"])
 email_notification = EmailVerificationNotification()
+password_notification = PasswordResetNotification()
 
 # Admin login endpoint
 @authRouter.post("/admin", response_model=AccessTokenResponse)
@@ -149,7 +150,7 @@ async def refresh_token(data: TokenRefreshRequest):
 
 # Forgot password endpoint (Admin and User both)
 @authRouter.post("/forgot-password", response_model=PasswordResetResponse)
-async def forgot_password(data: ForgotPasswordRequest):
+async def forgot_password(data: ForgotPasswordRequest, background_tasks: BackgroundTasks):
     try:
         if data.type.lower() == 'admin':
             resource = await admin_service.find_admin_with_email(data.email)
@@ -162,17 +163,18 @@ async def forgot_password(data: ForgotPasswordRequest):
             raise HTTPException(status_code=404, detail="Email not found")
         reset_token = await password_reset_service.create_password_reset_token(resource_id=resource["objectId"], user_type=data.type.lower(), email=str(data.email))
 
-        if reset_token is not None:
-            return {
-                "success": True,
-                "message": "Password reset token created and sent to email (simulated).",
-                "result": {
-                    "token": reset_token,
-                    "email": resource["email"]
-                }  # In real application, do not return the token in response
-            }
-        else:
+        if reset_token is None:
             raise HTTPException(status_code=500, detail="Could not create password reset token")
+
+        # Send password reset email in the background
+        background_tasks.add_task(password_notification.notify, resource["email"], reset_token, 60)
+        return {
+            "success": True,
+            "message": "Password reset token created and sent to email.",
+            "result": {
+                "email": resource["email"]
+            }
+        }
     except HTTPException:
         raise
     except Exception:

@@ -34,6 +34,7 @@ redis_host = os.getenv("REDIS_HOST", "localhost")
 redis_port = int(os.getenv("REDIS_PORT", 6379))
 redis_db = int(os.getenv("REDIS_DB", 0))
 cache_prefix = os.getenv("CACHE_PREFIX", "app_cache")
+frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 # Validate critical environment variables
 if not app_name:
@@ -60,6 +61,8 @@ if not ffmpeg_path:
     raise EnvironmentError("FFMPEG_PATH environment variable is not set.")
 if not mongo_url or not mongo_db:
     raise EnvironmentError("MONGO_URL and MONGO_DB environment variables must be set.")
+if not frontend_url or not frontend_url.startswith("http"):
+    raise EnvironmentError("FRONTEND_URL environment variable must be set and start with http or https.")
 
 # Return config as a dictionary
 config = {
@@ -84,5 +87,6 @@ config = {
     "redis_port": redis_port,
     "redis_db": redis_db,
     "cache_prefix": cache_prefix,
-    "cache_key": f"{app_name}_app_data"
+    "cache_key": f"{app_name}_app_data",
+    "frontend_url": frontend_url
 }

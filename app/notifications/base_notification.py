@@ -3,6 +3,8 @@ import smtplib
 from email.message import EmailMessage
 from abc import ABC, abstractmethod
 from config import config
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+from pathlib import Path
 
 class NotificationSender(ABC):
     def __init__(self):
@@ -11,6 +13,16 @@ class NotificationSender(ABC):
         self.mail_user = config["mail_username"]
         self.mail_pass = config["mail_password"]
         self.mail_from = config["mail_from"]
+
+        template_dir = Path(__file__).parent.parent / "templates"
+        self.jinja_env = Environment(
+            loader=FileSystemLoader(template_dir),
+            autoescape=select_autoescape(['html', 'xml'])
+        )
+
+    async def render_template(self, template_name: str, context: dict) -> str:
+        template = self.jinja_env.get_template(template_name)
+        return template.render(**context)
 
     async def send_email(self, to_email: str, subject: str, body: str) -> bool:
         try:
@@ -25,7 +37,7 @@ class NotificationSender(ABC):
                 smtp.send_message(msg)
 
             return True
-        except Exception as e:
+        except ValueError as e:
             return False
 
     @abstractmethod
