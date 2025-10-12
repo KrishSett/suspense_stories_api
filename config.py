@@ -25,9 +25,10 @@ log_file_name = os.getenv("LOG_FILE_NAME", "app.log")
 mail_mailer = os.getenv("MAIL_MAILER")
 mail_host = os.getenv("MAIL_HOST")
 mail_port = int(os.getenv("MAIL_PORT"))
-mail_username = os.getenv("MAIL_USERNAME", "app.log")
-mail_password = os.getenv("MAIL_PASSWORD", "app.log")
-mail_from = os.getenv("MAIL_FROM", "app.log")
+mail_username = os.getenv("MAIL_USERNAME")
+mail_password = os.getenv("MAIL_PASSWORD")
+mail_from = os.getenv("MAIL_FROM")
+mail_from_name = os.getenv("MAIL_FROM_NAME", "APP Support")
 file_download_dir = os.getenv("FILE_DOWNLOAD_DIR", "downloads")
 ffmpeg_path = os.getenv("FFMPEG_PATH")
 redis_host = os.getenv("REDIS_HOST", "localhost")
@@ -81,6 +82,7 @@ config = {
     "mail_username": mail_username,
     "mail_password": mail_password,
     "mail_from": mail_from,
+    "mail_from_name": mail_from_name,
     "file_download_dir": file_download_dir,
     "ffmpeg_path": ffmpeg_path,
     "redis_host": redis_host,
