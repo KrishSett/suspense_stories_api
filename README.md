@@ -1,6 +1,11 @@
-# suspense_stories_api
+# Suspense Stories API
 
 - A RESTful API for managing suspense stories with user and admin authentication, built with FastAPI and MongoDB.  
+
+# HOW TO SET UP
+- CONNECT WITH MONGODB
+- RUN REDIS CACHE
+- RUN FASTAPI
 
 ### Features
 - Dual Authentication System (User and Admin roles)
@@ -14,14 +19,11 @@
 - Email notification on new stories published
 - Pagination support for list pages (Channel, Story, Users, Admins)
 - HTML email templates for notifications
+- Refresh auth token functionality
+- Forget & reset password functionality
+- Email template centralization with Placeholder Values
 
 ### Future Implementations
 - Rate limiting for API endpoints
 - Search functionality for stories
-- Forget password functionality
-- Email template centralization with Placeholder Values
 
-# HOW TO SET UP
-- CONNECT WITH MONGODB
-- RUN REDIS CACHE
-- RUN FASTAPI
