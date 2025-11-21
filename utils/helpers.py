@@ -4,6 +4,7 @@ import time, uuid, re
 from jose import jwt, JWTError, ExpiredSignatureError
 from config import config
 from fastapi import HTTPException
+from urllib.parse import quote_plus
 
 # Get current ISO timestamp in UTC
 def get_current_iso_timestamp() -> datetime:
@@ -55,12 +56,24 @@ def decode_signed_url_token(token: str) -> dict:
     except JWTError:
         raise HTTPException(status_code=403, detail="Invalid token")
 
+# Generate a secure verification token
 def generate_verification_token() -> str:
     import secrets
     return secrets.token_urlsafe(32)
 
-from datetime import datetime, timedelta
-
+# Generate an expiry time in ISO format, defaulting to 5 minutes from now
 def generate_expiry_time(minutes: int = 5) -> str:
     expiry_time = datetime.utcnow() + timedelta(minutes=minutes)
     return expiry_time.isoformat()
+
+# Generate a placeholder image URL
+def generate_placeholder_img(text, width=75, height=75, bg_color="e5d5f7", text_color="77878"):
+    # Default text if empty
+    if not len(text):
+        text = "N/A"
+
+    # Encode text safely for URL
+    encoded_text = quote_plus(text)
+
+    url = f"https://placehold.co/{width}x{height}/{bg_color}/{text_color}?text={encoded_text}&font=poppins"
+    return url

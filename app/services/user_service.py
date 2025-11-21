@@ -194,7 +194,7 @@ class UserService(BaseService):
             return {"status": True, "message": "User updated successfully"}
         except PyMongoError as e:
             self.logger.error("Error in %s for ID %s: %s", "update_user", user_id, e)
-            raise HTTPException(status_code=500, detail="Could not update user data")
+            raise HTTPException(status_code=500, detail=f"Could not update user data {e}")
         except bson_errors.InvalidId:
             self.logger.warning("Invalid user ID for update: %s", user_id)
             raise HTTPException(status_code=400, detail="Invalid user ID")

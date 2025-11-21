@@ -1,13 +1,12 @@
 # users.py
 from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import FileResponse
-from typing import List, Dict, Any
 from auth.dependencies import JWTAuthGuard
-from app.models import PlaylistCreate, PlaylistCreateResponse, PaginatedAudioResponse, PaginatedChannelsResponse, FavoriteChannel, UserResponse
+from app.models import PlaylistCreate, PlaylistCreateResponse, PaginatedAudioResponse, PaginatedChannelsResponse, FavoriteChannel, UserResponse, UserProfileResponse, UserProfileUpdate
 from app.services import AdminService, UserService, ChannelService, AudioStoriesService
 from common import RedisHashCache
 from config import config
-from utils.helpers import generate_signed_url, decode_signed_url_token, process_cache_key, generate_unique_id
+from utils.helpers import generate_signed_url, decode_signed_url_token, process_cache_key, generate_unique_id, generate_placeholder_img
 from jose import jwt, JWTError
 from bson import ObjectId, errors as bson_errors
 import os
@@ -18,6 +17,69 @@ user_service = UserService()
 channel_service = ChannelService()
 audio_stories_service = AudioStoriesService()
 cache = RedisHashCache(prefix=config["cache_prefix"])
+
+# Get User Profile
+@userRouter.get("/profile", response_model=UserProfileResponse)
+async def get_user_profile(current_user: dict = Depends(JWTAuthGuard("user"))):
+    try:
+        cache_key = process_cache_key()
+
+        # Check cache
+        cached_profile = await cache.h_get(cache_key, "user_profile", {"user_id": current_user.get("id")})
+        if cached_profile is not None:
+            return cached_profile
+
+        # Fetch active user details
+        user = await user_service.get_user_details_by_id(current_user.get("id"))
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        user_profile = {
+            "firstname": user.get("firstname", ""),
+            "lastname": user.get("lastname", ""),
+            "email": user.get("email", ""),
+            "phone": user.get("phone", ""),
+            "profile_img": generate_placeholder_img(f"{user.get("firstname", "")[0]}{user.get("lastname", "")[0]}"),
+            "is_active": True,
+            "type": "user"
+        }
+
+        # Set user profile in cache
+        await cache.h_set(cache_key, "user_profile", user_profile, {"user_id": current_user.get("id")})
+        return user_profile
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Update User Profile
+@userRouter.put("/profile") #, response_model=UserResponse
+async def update_user_profile(
+        data: UserProfileUpdate,
+        current_user: dict = Depends(JWTAuthGuard("user"))
+):
+    try:
+        user = await user_service.get_user_details_by_id(current_user.get("id"))
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        update_data = {
+            "firstname": data.firstname,
+            "lastname": data.lastname,
+            "phone": data.phone
+        }
+
+        updated_user = await user_service.update_user(current_user.get("id"), update_data)
+        if not updated_user:
+            raise HTTPException(status_code=500, detail="Failed to update user profile")
+
+        # Invalidate cache
+        cache_key = process_cache_key()
+        await cache.h_del(cache_key, "user_profile", {"user_id": current_user.get("id")})
+
+        return {
+            "status": True,
+            "detail": "User profile updated successfully"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Get list of active channels
 @userRouter.get("/channels-list", response_model=PaginatedChannelsResponse)

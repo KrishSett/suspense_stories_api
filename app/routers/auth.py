@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks
-from app.models import LoginRequest, SignupRequest, TokenRefreshRequest, AccessTokenResponse, RefreshTokenResponse, ForgotPasswordRequest, PasswordResetRequest, PasswordResetResponse
+from app.models import LoginRequest, SignupRequest, TokenRefreshRequest, AccessTokenResponse, RefreshTokenResponse, ForgotPasswordRequest, PasswordResetRequest, PasswordResetResponse, VerifyEmailResponse
 from common.access_tokens import AccessTokenManager
 from common.password_utils import PasswordHasher
 from app.services import AdminService, UserService, PasswordResetService
@@ -97,7 +97,7 @@ async def user_signup(data: SignupRequest, background_tasks: BackgroundTasks):
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 # Email verification endpoint
-@authRouter.get("/verify-email/{token}")
+@authRouter.get("/verify-email/{token}", response_model=VerifyEmailResponse)
 async def verify_email(token: str):
     user = await user_service.find_by_verification_token(token)
 
@@ -109,7 +109,10 @@ async def verify_email(token: str):
         update_data={"is_verified": True, "verification_token": None}
     )
 
-    return {"message": "Email verified successfully"}
+    return {
+        "success": True,
+        "message": "Email verified successfully"
+    }
 
 # User login  endpoint
 @authRouter.post("/user", response_model=AccessTokenResponse)

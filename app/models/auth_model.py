@@ -33,3 +33,7 @@ class RefreshTokenResponse(BaseModel):
     access_token: str
     type: Literal["bearer"]
     expires_in: int
+
+class VerifyEmailResponse(BaseModel):
+    success: bool
+    message: str

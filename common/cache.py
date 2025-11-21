@@ -11,23 +11,27 @@ class RedisHashCache:
             decode_responses=True
         )
         self.prefix = prefix or ""
-        self.ttl = 1800  # Default TTL of 30 minutes
+        self.ttl = 7200  # Default TTL of 120 minutes
 
+    # Generate slug from params
     def generate_slug(self, params: dict) -> str:
         """Generate a slug string from params."""
         if not params:
             return ""
         return "|".join([f"{k}={v}" for k, v in params.items()])
 
+    # Build cache key with optional prefix
     def build_cache_key(self, cache_key: str) -> str:
         """Add prefix to cache key."""
         return f"{self.prefix}|{cache_key}" if self.prefix else cache_key
 
+    # Build field key with optional params
     def build_field_key(self, field: str, params: dict = None) -> str:
         """Add params as suffix to field key."""
         slug = self.generate_slug(params)
         return f"{field}|{slug}" if slug else field
 
+    # Set a specific field in the hash
     async def h_set(self, cache_key: str, field: str, value: any, params: dict = None):
         try:
             cache_key = self.build_cache_key(cache_key)
@@ -38,6 +42,7 @@ class RedisHashCache:
         except Exception as e:
             raise Exception(f"[h_set] Redis error: {str(e)}")
 
+    # Get a specific field from the hash
     async def h_get(self, cache_key: str, field: str, params: dict = None):
         try:
             cache_key = self.build_cache_key(cache_key)
@@ -50,6 +55,7 @@ class RedisHashCache:
             raise Exception(f"[h_get] Redis error: {str(e)}")
         return None
 
+    # Delete a specific field in the hash
     async def h_del(self, cache_key: str, field: str, params: dict = None):
         try:
             cache_key = self.build_cache_key(cache_key)
@@ -59,6 +65,7 @@ class RedisHashCache:
         except Exception as e:
             raise Exception(f"[h_del] Redis error: {str(e)}")
 
+    # Get all fields in the hash
     async def h_keys(self, cache_key: str):
         try:
             cache_key = self.build_cache_key(cache_key)
@@ -66,6 +73,7 @@ class RedisHashCache:
         except Exception as e:
             raise Exception(f"[h_keys] Redis error: {str(e)}")
 
+    # Get all fields and values in the hash
     async def h_get_all(self, cache_key: str):
         try:
             cache_key = self.build_cache_key(cache_key)
@@ -74,6 +82,7 @@ class RedisHashCache:
         except Exception as e:
             raise Exception(f"[h_get_all] Redis error: {str(e)}")
 
+    # Delete all fields matching a pattern (prefix match)
     async def h_del_wildcard(self, cache_key: str, pattern: str):
         try:
             cache_key = self.build_cache_key(cache_key)

@@ -1,6 +1,5 @@
 # user_model.py
 from typing import Optional, Dict, Any, List
-
 from pydantic import BaseModel, EmailStr, constr
 
 # Base user model
@@ -41,5 +40,33 @@ class PlaylistCreate(BaseModel):
     )
     videos: List
 
+# Playlist create response model
 class PlaylistCreateResponse(UserResponse):
     playlist_id: str
+
+# User profile model
+class UserProfileResponse(UserBase):
+    phone: Optional[constr(min_length=10, max_length=15)] = None
+    is_active: bool = True
+    profile_img: str
+    type: str
+
+# Model for user profile update
+class UserProfileUpdate(BaseModel):
+    firstname: Optional[constr(
+        strip_whitespace=True,
+        min_length=1,
+        max_length=50,
+        pattern=r'^[A-Za-z ]+$'
+    )] = None
+    lastname: Optional[constr(
+        strip_whitespace=True,
+        min_length=1,
+        max_length=50,
+        pattern=r'^[A-Za-z ]+$'
+    )] = None
+    phone: Optional[constr(
+        min_length=10,
+        max_length=15,
+        pattern=r'^\+?\d+$'
+    )] = None
