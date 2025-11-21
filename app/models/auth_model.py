@@ -16,6 +16,7 @@ class SignupRequest(BaseModel):
     lastname: str
     phone: str = None
     type: Literal["user"] # for now only user can signup
+    tnc: bool
 
 # Refresh token model
 class TokenRefreshRequest(BaseModel):

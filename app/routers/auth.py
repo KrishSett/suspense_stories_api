@@ -49,8 +49,18 @@ async def login(data: LoginRequest):
 @authRouter.post("/user/signup", response_model=AccessTokenResponse)
 async def user_signup(data: SignupRequest, background_tasks: BackgroundTasks):
     try:
+        # Ensure only 'user' type can sign up
         if data.type.strip().lower() != "user":
             raise HTTPException(status_code=403, detail="Unauthorized")
+
+        # Check tnc acceptance
+        if not data.tnc:
+            raise HTTPException(status_code=400, detail="Terms and conditions must be accepted")
+
+        # Check if user with the same email already exists
+        existing_user = await user_service.find_user_with_email(data.email)
+        if existing_user:
+            raise HTTPException(status_code=409, detail="User with this email already exists")
 
         hashed_password = password_hash.hash(data.password)
         verification_token = str(uuid.uuid4())
@@ -69,7 +79,8 @@ async def user_signup(data: SignupRequest, background_tasks: BackgroundTasks):
             "is_verified": False,
             "verification_token": verification_token,
             "created_at": None,
-            "updated_at": None
+            "updated_at": None,
+            "tnc": data.tnc
         }
 
         created_user = await user_service.create_user(new_user)

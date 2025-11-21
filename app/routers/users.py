@@ -40,7 +40,7 @@ async def get_user_profile(current_user: dict = Depends(JWTAuthGuard("user"))):
             "phone": user.get("phone", ""),
             "profile_img": generate_placeholder_img(f"{user.get("firstname", "")[0]}{user.get("lastname", "")[0]}"),
             "is_active": True,
-            "type": "user"
+            "type": user.get("role", "user")
         }
 
         # Set user profile in cache

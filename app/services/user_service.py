@@ -152,7 +152,7 @@ class UserService(BaseService):
         try:
             user = await self.db.users.find_one(
                 {"_id": ObjectId(user_id), "is_active": True},
-                {"_id": 0, "firstname": 1, "lastname": 1, "email": 1, "phone": 1, "favorite_channels": 1, "playlist": 1},
+                {"_id": 0, "firstname": 1, "lastname": 1, "email": 1, "phone": 1, "role": 1, "favorite_channels": 1, "playlist": 1},
             )
             if not user:
                 self.logger.warning("User not found for ID %s", user_id)
