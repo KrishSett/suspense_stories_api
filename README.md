@@ -22,8 +22,10 @@
 - Refresh auth token functionality
 - Forget & reset password functionality
 - Email template centralization with Placeholder Values
+- Site Pages (About Us, Terms & Conditions, Privacy Policy)
 
 ### Future Implementations
 - Rate limiting for API endpoints
 - Search functionality for stories
+- Subscription plans for users
 
