@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 from logging_setup import logger
 import traceback
 from app.middleware.logging_middleware import LoggingMiddleware
+from app.middleware.cors import CORSConfig
 from app.routers import authRouter, adminRouter, userRouter, pageRouter
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -14,6 +15,9 @@ app = FastAPI(
     redoc_url=None,
     openapi_url=None
 )
+
+# Setup CORS
+CORSConfig.setup_cors(app)
 
 # Add middleware and routers
 app.add_middleware(LoggingMiddleware, logger=logger)

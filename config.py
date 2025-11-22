@@ -14,6 +14,7 @@ load_dotenv(dotenv_path=env_path)
 
 # Access and validate required variables
 app_name = os.getenv("APP_NAME", "APP Name")
+app_env = os.getenv("APP_ENV", "development")
 base_url = os.getenv("BASE_URL", "http://localhost:8000")
 mongo_url = os.getenv("MONGO_URL")
 mongo_db = os.getenv("MONGO_DB")
@@ -40,6 +41,8 @@ frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
 # Validate critical environment variables
 if not app_name:
     raise EnvironmentError("APP_NAME environment variable is not set.")
+if not app_env:
+    raise EnvironmentError("APP_ENV environment variable is not set.")
 if not base_url:
     raise EnvironmentError("BASE_URL environment variable is not set.")
 if not secret_key:
@@ -68,6 +71,7 @@ if not frontend_url or not frontend_url.startswith("http"):
 # Return config as a dictionary
 config = {
     "app_name": app_name,
+    "app_env": app_env,
     "base_url": base_url,
     "mongo_url": mongo_url,
     "mongo_db": mongo_db,

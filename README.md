@@ -4,7 +4,8 @@
 
 # HOW TO SET UP
 - CONNECT WITH MONGODB
-- RUN REDIS CACHE
+- RUN REDIS SERVER
+- SET VIRTUAL ENVIRONMENT
 - RUN FASTAPI
 
 ### Features
@@ -22,10 +23,13 @@
 - Refresh auth token functionality
 - Forget & reset password functionality
 - Email template centralization with Placeholder Values
+- Playlist feature for users to save favorite stories
 - Site Pages (About Us, Terms & Conditions, Privacy Policy)
 
 ### Future Implementations
 - Rate limiting for API endpoints
 - Search functionality for stories
 - Subscription plans for users
+- Playlist running feature
+- Admin dashboard for analytics
 
