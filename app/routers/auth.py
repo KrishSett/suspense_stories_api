@@ -37,8 +37,12 @@ async def login(data: LoginRequest):
         if not admin or not password_hash.verify(data.password, admin["password_hash"]):
             raise HTTPException(status_code=401, detail="Invalid credentials")
 
+        remember_token = False
+        if data.remember_me and bool(data.remember_me) is True:
+            remember_token = True
+
         # Create access and refresh tokens for the admin
-        token_response = await access_token_manager.generate_tokens(user_id=admin["objectId"], user_email=admin["email"], role="admin")
+        token_response = await access_token_manager.generate_tokens(user_id=admin["objectId"], user_email=admin["email"], role="admin", remember_token=remember_token)
         return token_response
     except HTTPException:
         raise
@@ -142,8 +146,12 @@ async def user_login(data: LoginRequest):
         if not user["is_verified"]:
             raise HTTPException(status_code=403, detail="Email not verified")
 
+        remember_token = False
+        if data.remember_me and bool(data.remember_me) is True:
+            remember_token = True
+
         # Create access and refresh tokens for the user
-        token_response = await access_token_manager.generate_tokens(user_id=user["objectId"], user_email=user["email"], role="user")
+        token_response = await access_token_manager.generate_tokens(user_id=user["objectId"], user_email=user["email"], role="user", remember_token=remember_token)
         return token_response
     except HTTPException:
         raise

@@ -2,6 +2,7 @@
 from pydantic import EmailStr
 from auth.jwt_auth import JWTAuth
 import base64
+from datetime import timedelta
 
 class AccessTokenManager:
     def __init__(self):
@@ -16,20 +17,26 @@ class AccessTokenManager:
         })
 
     # Create a new refresh token for the given user ID and role.
-    async def __create_refresh_token(self, user_id: str, user_email: EmailStr, role: str) -> str:
-        return await self.jwt_auth.create_refresh_token({
-            "id": user_id,
-            "sub":user_email,
-            "role": role
-        })
+    async def __create_refresh_token(self, user_id: str, user_email: EmailStr, role: str, remember_token: bool) -> str:
+        # Long expiry for remember me -> 30 days
+        expires = timedelta(days=30) if remember_token else None
+
+        return await self.jwt_auth.create_refresh_token(
+            {
+                "id": user_id,
+                "sub": user_email,
+                "role": role
+            },
+            expires_delta=expires
+        )
 
     # Generate both access and refresh tokens for a user.
-    async def generate_tokens(self, user_id: str, user_email: EmailStr, role: str) -> dict:
+    async def generate_tokens(self, user_id: str, user_email: EmailStr, role: str, remember_token: bool = False) -> dict:
         if role not in ("admin", "user"):
             raise Exception("Invalid role specified. Must be 'admin' or 'user'.")
 
         access_token = await self.__create_access_token(user_id, user_email, role)
-        refresh_token = await self.__create_refresh_token(user_id, user_email, role)
+        refresh_token = await self.__create_refresh_token(user_id, user_email, role, remember_token)
         encoded_refresh_token = base64.b64encode(refresh_token.encode('ascii'))
 
         return {

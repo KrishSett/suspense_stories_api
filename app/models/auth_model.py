@@ -7,6 +7,7 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: str
     type: Literal["admin", "user"]
+    remember_me: bool = False
 
 # Signup request model
 class SignupRequest(BaseModel):
