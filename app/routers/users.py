@@ -2,12 +2,12 @@
 from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import FileResponse
 from auth.dependencies import JWTAuthGuard
-from app.models import PlaylistCreate, PlaylistCreateResponse, PaginatedAudioResponse, PaginatedChannelsResponse, FavoriteChannel, UserResponse, UserProfileResponse, UserProfileUpdate
+from app.models import PlaylistCreate, PlaylistCreateResponse, PaginatedAudioResponse, PaginatedChannelsResponse, FavoriteChannel, UserResponse, UserProfileResponse, UserProfileUpdate, SignOutResponse
 from app.services import AdminService, UserService, ChannelService, AudioStoriesService
 from common import RedisHashCache
 from config import config
 from utils.helpers import generate_signed_url, decode_signed_url_token, process_cache_key, generate_unique_id, generate_placeholder_img
-from jose import jwt, JWTError
+from jose import JWTError
 from bson import ObjectId, errors as bson_errors
 import os
 
@@ -50,7 +50,7 @@ async def get_user_profile(current_user: dict = Depends(JWTAuthGuard("user"))):
         raise HTTPException(status_code=500, detail=str(e))
 
 # Update User Profile
-@userRouter.put("/profile") #, response_model=UserResponse
+@userRouter.put("/profile", response_model=UserResponse)
 async def update_user_profile(
         data: UserProfileUpdate,
         current_user: dict = Depends(JWTAuthGuard("user"))
@@ -116,9 +116,9 @@ async def list_stories(
 ):
     try :
         cache_key = process_cache_key()
+
         # Check cache
         cached_stories = await cache.h_get(cache_key, "channel_story", {"channel_id": channel_id, "page": page, "page_size": page_size})
-
         if cached_stories is not None:
             return cached_stories
 
@@ -140,10 +140,10 @@ async def list_stories(
         if not stories:
             raise HTTPException(status_code=404, detail="No stories found for this channel")
 
-        stories["channel"] = channel_info
+        stories["channel_info"] = channel_info
 
         # Paginated response
-        await cache.h_set(cache_key, "channel_story", stories, {"channel_id": channel_id, "page": page, "page_size": page_size})
+        await cache.h_set(cache_key, "channel_story", stories, {"channel_id": str(channel_id), "page": page, "page_size": page_size})
         return stories
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -245,5 +245,20 @@ async def create_playlist(data: PlaylistCreate, current_user: dict = Depends(JWT
             raise HTTPException(status_code=500, detail="Failed to create playlist")
 
         return {"status": True, "detail": "Playlist created successfully", "playlist_id": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# User sign-out functionality
+@userRouter.post("/sign-out", response_model=SignOutResponse)
+async def user_logout(current_user: dict = Depends(JWTAuthGuard("user"))):
+    try:
+        user = await user_service.get_user_details_by_id(current_user.get("id"))
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        return {
+            "status": True,
+            "detail": "User sign out success"
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

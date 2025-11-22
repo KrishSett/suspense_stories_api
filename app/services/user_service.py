@@ -293,3 +293,15 @@ class UserService(BaseService):
         except PyMongoError as e:
             self.logger.error("Error creating playlist for user %s: %s", user_id, e)
             raise HTTPException(status_code=500, detail="Could not create playlist")
+
+        # User sign-out functionality to invalidate tokens
+        async def logout_user(self, user_id: str) -> dict:
+            try:
+                # Here you would typically add logic to invalidate the user's tokens
+                # For example, adding the token to a blacklist or updating a token version in the database
+
+                self.logger.info("User %s logged out successfully", user_id)
+                return {"status": True, "message": "User logged out successfully"}
+            except Exception as e:
+                self.logger.error("Error logging out user %s: %s", user_id, e)
+                raise HTTPException(status_code=500, detail="Could not log out user")

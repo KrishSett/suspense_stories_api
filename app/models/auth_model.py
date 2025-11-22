@@ -30,12 +30,14 @@ class AccessTokenResponse(BaseModel):
     refresh_token: str
     expires_in: int
 
+# Refresh token response model
 class RefreshTokenResponse(BaseModel):
     success: bool
     access_token: str
     type: Literal["bearer"]
     expires_in: int
 
+# Verify email response model
 class VerifyEmailResponse(BaseModel):
     success: bool
     message: str

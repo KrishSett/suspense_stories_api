@@ -2,3 +2,4 @@
 from .admins import adminRouter
 from .auth import authRouter
 from .users import userRouter
+from .pages import pageRouter

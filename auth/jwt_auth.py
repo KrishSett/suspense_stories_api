@@ -17,7 +17,7 @@ class JWTAuth:
         to_encode.update({"exp": expire, "type": "access"})
         return jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
 
-    # Create a refresh token with the given data and optional expiry.
+    # Create a refresh token with the given data and optional expiry based on remember me token.
     async def create_refresh_token(self, data: dict, expires_delta: Optional[timedelta] = None) -> str:
         to_encode = data.copy()
 

@@ -5,3 +5,4 @@ from .channel_model import *
 from .audio_story_model import *
 from .user_model import *
 from .password_reset_model import *
+from .page_model import *

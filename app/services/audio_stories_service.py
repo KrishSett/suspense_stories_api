@@ -141,15 +141,33 @@ class AudioStoriesService(BaseService):
             raise HTTPException(status_code=500, detail="Could not update audio story as ready")
 
     # Get audio stories by channel ID with pagination
-    async def get_audio_story_by_channel_id(self, channel_id: str, page: int = 1, page_size: int = 10) -> Optional[dict]:
+    async def get_audio_story_by_channel_id(self, channel_id: str, page: int = 1, page_size: int = 10) -> Optional[
+        dict]:
         try:
             skip = (page - 1) * page_size
 
-            query = {"channel_id": channel_id, "is_ready": True}
-            projection = {"_id": 1, "meta_details": 1, "created_at": 1}
+            # Validate inputs
+            if page < 1:
+                page = 1
+            if page_size < 1 or page_size > 100:
+                page_size = 10  # Set reasonable limits
+
+            query = {"channel_id": ObjectId(channel_id), "is_ready": True}
+            projection = {"_id": 1, "channel_id": 1, "meta_details": 1, "created_at": 1}  # Added channel_id
 
             # Count total matching stories
             total_stories = await self.db.audio_stories.count_documents(query)
+
+            # If no stories found, return empty response instead of error
+            if total_stories == 0:
+                self.logger.info("No audio stories found for channel ID %s", channel_id)
+                return {
+                    "total": 0,
+                    "page": page,
+                    "page_size": page_size,
+                    "total_pages": 0,
+                    "data": []
+                }
 
             # Fetch paginated results sorted by created_at DESC
             cursor = (
@@ -162,23 +180,23 @@ class AudioStoriesService(BaseService):
 
             result = await cursor.to_list(length=page_size)
 
-            if not result:
-                self.logger.warning("No audio stories found for channel ID %s", channel_id)
-                raise HTTPException(status_code=404, detail="Audio story not found")
-
             # Convert ObjectId to str and format response
-            stories = [
-                {
-                    "story_id": str(story["_id"]),
-                    "channel_id": str(story.get("channel_id", channel_id)),
-                    "meta_details": story.get("meta_details", {})
-                }
-                for story in result
-            ]
+            stories = []
+            for story in result:
+                try:
+                    story_data = {
+                        "id": str(story["_id"]),
+                        "channel_id": str(story.get("channel_id", channel_id)),
+                        "meta_details": story.get("meta_details", {})
+                    }
+                    stories.append(story_data)
+                except KeyError as e:
+                    self.logger.warning("Missing expected field in story: %s", e)
+                    continue  # Skip malformed documents
 
             self.logger.info(
-                "Fetched %d stories for channel %s (page %d, page_size %d)",
-                len(stories), channel_id, page, page_size
+                "Fetched %d stories for channel %s (page %d, page_size %d, total: %d)",
+                len(stories), channel_id, page, page_size, total_stories
             )
 
             return {
@@ -192,9 +210,9 @@ class AudioStoriesService(BaseService):
         except Exception as e:
             self.logger.error(
                 "Error in get_audio_story_by_channel_id for channel %s: %s",
-                channel_id, e
+                channel_id, str(e)
             )
-            raise HTTPException(status_code=500, detail="Could not fetch audio story data")
+            raise HTTPException(status_code=500, detail=f"Could not fetch audio stories for channel {channel_id}")
 
     # Get audio story file by ID
     async def get_audio_story_by_id(self, story_id: str) -> Optional[dict]:

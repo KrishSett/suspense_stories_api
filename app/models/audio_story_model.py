@@ -31,7 +31,9 @@ class AudioStoryDB(BaseModel):
 
 # Model for audio story list
 class AudioStoryList(AudioStoryBase):
-    story_id: str
+    id: str
+    channel_id: str
+    meta_details: Optional[Dict] = None
 
 # Model for paginated response of audio stories
 class PaginatedAudioResponse(BaseModel):
@@ -39,5 +41,5 @@ class PaginatedAudioResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
-    channel: Optional[Dict[str, Any]] = None
+    channel_info: Optional[Dict[str, Any]] = None
     data: List[AudioStoryList]

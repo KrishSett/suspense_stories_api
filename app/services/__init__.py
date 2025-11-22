@@ -4,5 +4,6 @@ from .channel_service import ChannelService
 from .audio_stories_service import AudioStoriesService
 from .user_service import UserService
 from .password_reset_service import PasswordResetService
+from .page_service import PageService
 
-__all__ = ['AdminService', 'ChannelService', 'AudioStoriesService', 'UserService', 'PasswordResetService']
+__all__ = ['AdminService', 'ChannelService', 'AudioStoriesService', 'UserService', 'PasswordResetService', 'PageService']

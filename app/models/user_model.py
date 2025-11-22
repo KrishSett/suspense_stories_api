@@ -70,3 +70,8 @@ class UserProfileUpdate(BaseModel):
         max_length=15,
         pattern=r'^\+?\d+$'
     )] = None
+
+# Model for sign-out response
+class SignOutResponse(BaseModel):
+    status: bool
+    detail: str

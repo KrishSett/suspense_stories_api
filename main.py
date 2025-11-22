@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from logging_setup import logger
 import traceback
 from app.middleware.logging_middleware import LoggingMiddleware
-from app.routers import authRouter, adminRouter, userRouter
+from app.routers import authRouter, adminRouter, userRouter, pageRouter
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -20,6 +20,7 @@ app.add_middleware(LoggingMiddleware, logger=logger)
 app.include_router(authRouter)
 app.include_router(adminRouter)
 app.include_router(userRouter)
+app.include_router(pageRouter)
 
 # Global error handler
 @app.exception_handler(Exception)
