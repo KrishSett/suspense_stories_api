@@ -2,8 +2,8 @@
 from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import FileResponse
 from auth.dependencies import JWTAuthGuard
-from app.models import PlaylistCreate, PlaylistCreateResponse, PaginatedAudioResponse, PaginatedChannelsResponse, FavoriteChannel, UserResponse, UserProfileResponse, UserProfileUpdate, SignOutResponse
-from app.services import AdminService, UserService, ChannelService, AudioStoriesService
+from app.models import PlaylistCreate, PlaylistContentUpdate, PlaylistCreateResponse, PaginatedAudioResponse, PaginatedChannelsResponse, FavoriteChannel, UserResponse, UserProfileResponse, UserProfileUpdate, SignOutResponse
+from app.services import AdminService, UserService, ChannelService, AudioStoriesService, PlaylistService
 from common import RedisHashCache
 from config import config
 from utils.helpers import generate_signed_url, decode_signed_url_token, process_cache_key, generate_unique_id, generate_placeholder_img
@@ -16,7 +16,23 @@ admin_service = AdminService()
 user_service = UserService()
 channel_service = ChannelService()
 audio_stories_service = AudioStoriesService()
+playlist_service = PlaylistService()
 cache = RedisHashCache(prefix=config["cache_prefix"])
+
+# User sign-out functionality
+@userRouter.post("/sign-out", response_model=SignOutResponse)
+async def user_logout(current_user: dict = Depends(JWTAuthGuard("user"))):
+    try:
+        user = await user_service.get_user_details_by_id(current_user.get("id"))
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        return {
+            "status": True,
+            "detail": "User sign out success"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Get User Profile
 @userRouter.get("/profile", response_model=UserProfileResponse)
@@ -189,7 +205,7 @@ async def audio_download(filename: str, token: str = Query(...)):
 
     return FileResponse(file_path, media_type="audio/mpeg")
 
-# Update playlist
+# Update favourite channel bookmark
 @userRouter.post("/channel/update-favourite", response_model=UserResponse)
 async def update_favorite_channel(
         data: FavoriteChannel,
@@ -200,6 +216,7 @@ async def update_favorite_channel(
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
+        # Check and validate the given channel Id
         channel = await channel_service.find_channel_by_id(data.channel_id)
         if not channel or not channel.get("is_active", True):
             raise HTTPException(status_code=404, detail="Channel not found")
@@ -225,21 +242,23 @@ async def create_playlist(data: PlaylistCreate, current_user: dict = Depends(JWT
             raise HTTPException(status_code=404, detail="User not found")
 
         if not len(data.videos):
-            raise HTTPException(status_code=400, detail="Playlist must contain at least one video")
+            videos = []
+        else:
+            try:
+                videos = [ObjectId(v) for v in data.videos]
+            except bson_errors.InvalidId:
+                raise HTTPException(status_code=400, detail="Invalid video ID format")
 
-        try:
-            videos = [ObjectId(v) for v in data.videos]
-        except bson_errors.InvalidId:
-            raise HTTPException(status_code=400, detail="Invalid video ID format")
+        playlist_name = "My Playlist" if data.name.lower() != "my playlist" else data.name.title()
 
         playlist_attributes = {
             "playlist_id": str(generate_unique_id()),
-            "name": data.name,
+            "name": playlist_name, #Name is hard coded to my playlist otherwise data.name
             "videos": videos
         }
 
-        # Create the playlist logic here
-        result  = await user_service.create_playlist(current_user.get("id"), playlist_attributes)
+        # Create the playlist for user
+        result  = await playlist_service.create_playlist(current_user.get("id"), playlist_attributes)
 
         if not result :
             raise HTTPException(status_code=500, detail="Failed to create playlist")
@@ -248,17 +267,72 @@ async def create_playlist(data: PlaylistCreate, current_user: dict = Depends(JWT
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# User sign-out functionality
-@userRouter.post("/sign-out", response_model=SignOutResponse)
-async def user_logout(current_user: dict = Depends(JWTAuthGuard("user"))):
+# Add video to playlist
+@userRouter.put("/manage/playlists/videos", response_model=UserResponse)
+async def add_video_to_playlist(
+    data: PlaylistContentUpdate,
+    current_user: dict = Depends(JWTAuthGuard("user"))
+):
     try:
         user = await user_service.get_user_details_by_id(current_user.get("id"))
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
+        # Add video to playlist
+        result = await playlist_service.add_video_to_playlist(
+            current_user.get("id"),
+            data.video_id
+        )
+
         return {
             "status": True,
-            "detail": "User sign out success"
+            "detail": result["message"]
         }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Remove video from playlist
+@userRouter.delete("/manage/playlists/videos", response_model=UserResponse)
+async def remove_video_from_playlist(
+    data: PlaylistContentUpdate,
+    current_user: dict = Depends(JWTAuthGuard("user"))
+):
+    try:
+        user = await user_service.get_user_details_by_id(current_user.get("id"))
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Remove video from playlist
+        result = await playlist_service.remove_video_from_playlist(
+            current_user.get("id"),
+            data.video_id
+        )
+
+        return {
+            "status": True,
+            "detail": result["message"]
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Remove an existing playlist of
+@userRouter.delete("/manage/playlists", response_model=UserResponse)
+async def delete_playlist(current_user: dict = Depends(JWTAuthGuard("user"))):
+    try:
+        user = await user_service.get_user_details_by_id(current_user.get("id"))
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Remove the playlist for user
+        result  = await playlist_service.remove_playlist(current_user.get("id"))
+
+        if not result :
+            raise HTTPException(status_code=500, detail="Failed to remove playlist")
+
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

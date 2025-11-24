@@ -237,7 +237,6 @@ class UserService(BaseService):
     # Update favourite status of a channel
     async def update_favourite_status(self, user_id: str, channel_id: str, is_favourite: bool) -> Optional[dict]:
         try:
-
             if is_favourite:
                 result = await self.db.users.update_one(
                     {"_id": ObjectId(user_id)},
@@ -266,42 +265,16 @@ class UserService(BaseService):
             raise HTTPException(status_code=400, detail="Invalid channel ID")
         except PyMongoError as e:
             self.logger.error("Error in %s for ID %s: %s", "update_favourite_status", channel_id, e)
-            raise HTTPException(status_code=500, detail="Could not update favourite status")
+            raise HTTPException(status_code=500, detail=f"Could not update favourite status: {e}")
 
-    # Create a new playlist for a user
-    async def create_playlist(self, user_id: str, playlist_data: dict) -> str:
+    # User sign-out functionality to invalidate tokens
+    async def logout_user(self, user_id: str) -> dict:
         try:
-            try:
-                user_obj_id = ObjectId(user_id)
-            except Exception:
-                raise HTTPException(status_code=400, detail="Invalid user ID")
+            # Here you would typically add logic to invalidate the user's tokens
+            # For example, adding the token to a blacklist or updating a token version in the database
 
-            result = await self.db.users.update_one(
-                {"_id": user_obj_id},
-                {
-                    "$push": {"playlists": playlist_data},
-                    "$set": {"updated_at": get_current_iso_timestamp()}
-                }
-            )
-
-            if result.modified_count == 0:
-                self.logger.warning("Playlist not created for user %s", user_id)
-                raise HTTPException(status_code=404, detail="User not found")
-
-            self.logger.info("Playlist '%s' created for user %s", playlist_data.get("name", "Playlist"), user_id)
-            return playlist_data.get("playlist_id")
-        except PyMongoError as e:
-            self.logger.error("Error creating playlist for user %s: %s", user_id, e)
-            raise HTTPException(status_code=500, detail="Could not create playlist")
-
-        # User sign-out functionality to invalidate tokens
-        async def logout_user(self, user_id: str) -> dict:
-            try:
-                # Here you would typically add logic to invalidate the user's tokens
-                # For example, adding the token to a blacklist or updating a token version in the database
-
-                self.logger.info("User %s logged out successfully", user_id)
-                return {"status": True, "message": "User logged out successfully"}
-            except Exception as e:
-                self.logger.error("Error logging out user %s: %s", user_id, e)
-                raise HTTPException(status_code=500, detail="Could not log out user")
+            self.logger.info("User %s logged out successfully", user_id)
+            return {"status": True, "message": "User logged out successfully"}
+        except Exception as e:
+            self.logger.error("Error logging out user %s: %s", user_id, e)
+            raise HTTPException(status_code=500, detail="Could not log out user")

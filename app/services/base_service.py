@@ -1,5 +1,5 @@
 # base_service.py
-from db import db  # your MongoDB connection setup
+from db import db
 import logging
 import os
 

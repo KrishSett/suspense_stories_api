@@ -25,6 +25,7 @@
 - Email template centralization with Placeholder Values
 - Playlist feature for users to save favorite stories
 - Site Pages (About Us, Terms & Conditions, Privacy Policy)
+- Playlist creation and management for users
 
 ### Future Implementations
 - Rate limiting for API endpoints

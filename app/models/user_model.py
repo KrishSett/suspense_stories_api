@@ -40,6 +40,10 @@ class PlaylistCreate(BaseModel):
     )
     videos: List
 
+# Model for updating an existing playlist contents
+class PlaylistContentUpdate(BaseModel):
+    video_id: str
+
 # Playlist create response model
 class PlaylistCreateResponse(UserResponse):
     playlist_id: str
