@@ -243,3 +243,20 @@ class PlaylistService(BaseService):
         except PyMongoError as e:
             self.logger.error("Error removing playlist for %s: %s", user_id, e)
             raise HTTPException(status_code=500, detail="Could not remove playlist")
+
+    # Get all videos in a user's playlist
+    async def get_user_playlist_details(self, user_id: str):
+        try:
+            user_obj_id = ObjectId(user_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid user ID")
+
+        user = await self.db.users.find_one(
+            {"_id": user_obj_id},
+            {"playlists": 1, "_id": 0}
+        )
+
+        if not user or not user.get("playlists"):
+            return []
+
+        return user["playlists"][0]

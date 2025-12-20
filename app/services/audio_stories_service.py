@@ -5,6 +5,7 @@ from pymongo.errors import PyMongoError
 from app.services.base_service import BaseService
 from bson import ObjectId, errors as bson_errors
 from utils.helpers import get_current_iso_timestamp
+from fastapi.encoders import jsonable_encoder
 
 class AudioStoriesService(BaseService):
     def __init__(self):
@@ -231,3 +232,60 @@ class AudioStoriesService(BaseService):
                 "Error in get_audio_story_by_id for ID %s: %s", story_id, e, exc_info=True
             )
             raise HTTPException(status_code=500, detail="Could not fetch audio story data")
+
+    # Get multiple audio stories by their IDs with channel info
+    async def get_audio_stories_by_ids(self, video_ids: list[str]):
+        try:
+            object_ids = [
+                ObjectId(vid)
+                for vid in video_ids
+                if ObjectId.is_valid(vid)
+            ]
+
+            if not object_ids:
+                return []
+
+            pipeline = [
+                {
+                    "$match": {
+                        "_id": {"$in": object_ids}
+                    }
+                },
+                {
+                    "$lookup": {
+                        "from": "channels",
+                        "localField": "channel_id",
+                        "foreignField": "_id",
+                        "as": "channel"
+                    }
+                },
+                {
+                    "$unwind": {
+                        "path": "$channel",
+                        "preserveNullAndEmptyArrays": False
+                    }
+                },
+                {
+                    "$project": {
+                        "_id": 0,
+                        "file_path": 1,
+                        "file_name": 1,
+                        "meta_details": 1,
+                        "channel": {
+                            "youtube_channel_id": "$channel.youtube_channel_id",
+                            "title": "$channel.title",
+                            "thumbnail_url": "$channel.thumbnail_url"
+                        }
+                    }
+                }
+            ]
+
+            cursor = self.db.audio_stories.aggregate(pipeline)
+            result = await cursor.to_list(length=None)
+            return jsonable_encoder(result)
+        except PyMongoError as e:
+            self.logger.error("Mongo error fetching audio stories: %s", e)
+            raise HTTPException(status_code=500, detail="Database error")
+        except Exception as e:
+            self.logger.error("Unexpected error fetching audio stories: %s", e)
+            raise HTTPException(status_code=500, detail="Internal server error")

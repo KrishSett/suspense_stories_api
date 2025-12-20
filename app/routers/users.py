@@ -2,7 +2,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import FileResponse
 from auth.dependencies import JWTAuthGuard
-from app.models import PlaylistCreate, PlaylistContentUpdate, PlaylistCreateResponse, PaginatedAudioResponse, PaginatedChannelsResponse, FavoriteChannel, UserResponse, UserProfileResponse, UserProfileUpdate, SignOutResponse
+from app.models import PlaylistCreate, PlaylistContentUpdate, PlaylistCreateResponse, PaginatedAudioResponse, PaginatedChannelsResponse, FavoriteChannel, UserResponse, UserProfileResponse, UserProfileUpdate, SignOutResponse, PlaylistContentsResponse
 from app.services import AdminService, UserService, ChannelService, AudioStoriesService, PlaylistService
 from common import RedisHashCache
 from config import config
@@ -334,5 +334,45 @@ async def delete_playlist(current_user: dict = Depends(JWTAuthGuard("user"))):
             raise HTTPException(status_code=500, detail="Failed to remove playlist")
 
         return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Playlist contents retrieval
+@userRouter.get("/playlist/contents", response_model=PlaylistContentsResponse)
+async def get_playlist_contents(current_user: dict = Depends(JWTAuthGuard("user"))):
+    try:
+        user = await user_service.get_user_details_by_id(current_user.get("id"))
+
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Get the playlist contents for user
+        playlist  = await playlist_service.get_user_playlist(current_user.get("id"))
+
+        # Check if playlist exists
+        if not playlist :
+            raise HTTPException(status_code=500, detail="Failed to fetch playlist contents")
+
+        user_playlist = await playlist_service.get_user_playlist_details(current_user.get("id"))
+
+        # Check if playlist has videos
+        if not user_playlist:
+            raise HTTPException(status_code=404, detail="No contents found in the playlist")
+
+        playlist_id = user_playlist.get("playlist_id", "")
+        name = user_playlist.get("name", "")
+        user_video_ids = list(map(str, user_playlist.get("videos", [])))
+
+        playlist_videos = await audio_stories_service.get_audio_stories_by_ids(user_video_ids)
+
+        if not playlist_videos:
+            raise HTTPException(status_code=404, detail="No videos found in the playlist")
+
+        return {
+            "playlist_id": playlist_id,
+            "name": name,
+            "playlist_items": playlist_videos
+        }
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

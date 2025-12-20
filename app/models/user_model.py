@@ -79,3 +79,9 @@ class UserProfileUpdate(BaseModel):
 class SignOutResponse(BaseModel):
     status: bool
     detail: str
+
+# Model for playlist contents
+class PlaylistContentsResponse(BaseModel):
+    playlist_id: str
+    name: str
+    playlist_items: List[Dict[str, Any]]
