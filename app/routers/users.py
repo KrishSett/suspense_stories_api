@@ -112,10 +112,17 @@ async def get_channels(
         if cached_channels is not None:
             return cached_channels
 
+        # Fetch user details to ensure user exists
+        user = await user_service.get_user_details_by_id(current_user.get("id"))
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Check channel service for active channels
         channels = await channel_service.list_active_channels(page=page, page_size=page_size)
 
         if not channels:
             raise HTTPException(status_code=404, detail="No active channels found.")
+
         # Paginated response
         await cache.h_set(cache_key, "list_active_channels", channels, {"page": page, "page_size": page_size})
         return channels
@@ -137,6 +144,11 @@ async def list_stories(
         cached_stories = await cache.h_get(cache_key, "channel_story", {"channel_id": channel_id, "page": page, "page_size": page_size})
         if cached_stories is not None:
             return cached_stories
+
+        # Fetch user details to ensure user exists
+        user = await user_service.get_user_details_by_id(current_user.get("id"))
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
 
         channel = await channel_service.find_channel_by_id(channel_id)
         if not channel:
@@ -171,6 +183,11 @@ async def fetch_audio(story_id: str, current_user: dict = Depends(JWTAuthGuard("
         raise HTTPException(status_code=400, detail="Story ID is required")
     if not story_id.isalnum():
         raise HTTPException(status_code=400, detail="Invalid Story ID format")
+
+    # Ensure user exists
+    user = await user_service.get_user_details_by_id(current_user.get("id"))
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
 
     # Fetch the audio story by ID
     story = await audio_stories_service.get_audio_story_by_id(story_id)
@@ -216,7 +233,7 @@ async def update_favorite_channel(
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
-        # Check and validate the given channel Id
+        # Check and validate the given channel id
         channel = await channel_service.find_channel_by_id(data.channel_id)
         if not channel or not channel.get("is_active", True):
             raise HTTPException(status_code=404, detail="Channel not found")
@@ -253,9 +270,13 @@ async def create_playlist(data: PlaylistCreate, current_user: dict = Depends(JWT
 
         playlist_attributes = {
             "playlist_id": str(generate_unique_id()),
-            "name": playlist_name, #Name is hard coded to my playlist otherwise data.name
+            "name": playlist_name, # Name is hard coded to my playlist otherwise data.name
             "videos": videos
         }
+
+        # Invalidate user playlist cache
+        cache_key = process_cache_key()
+        await cache.h_del(cache_key, "user_playlist_contents", {"user_id": current_user.get("id")})
 
         # Create the playlist for user
         result  = await playlist_service.create_playlist(current_user.get("id"), playlist_attributes)
@@ -263,11 +284,20 @@ async def create_playlist(data: PlaylistCreate, current_user: dict = Depends(JWT
         if not result :
             raise HTTPException(status_code=500, detail="Failed to create playlist")
 
-        return {"status": True, "detail": "Playlist created successfully", "playlist_id": result}
+        # Invalidate user playlist cache
+        cache_key = process_cache_key()
+        await cache.h_del(cache_key, "user_playlist_contents", {"user_id": current_user.get("id")})
+
+         # Success response
+        return {
+            "status": True,
+            "detail": "Playlist created successfully",
+            "playlist_id": result
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Add video to playlist
+# Add a video to the user's playlist
 @userRouter.put("/manage/playlists/videos", response_model=UserResponse)
 async def add_video_to_playlist(
     data: PlaylistContentUpdate,
@@ -278,12 +308,17 @@ async def add_video_to_playlist(
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
-        # Add video to playlist
+        # Add the video to the user's playlist with given video ID
         result = await playlist_service.add_video_to_playlist(
             current_user.get("id"),
             data.video_id
         )
 
+        # Invalidate user playlist cache
+        cache_key = process_cache_key()
+        await cache.h_del(cache_key, "user_playlist_contents", {"user_id": current_user.get("id")})
+
+        # Return success response
         return {
             "status": True,
             "detail": result["message"]
@@ -293,7 +328,7 @@ async def add_video_to_playlist(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Remove video from playlist
+# Remove a video from playlist
 @userRouter.delete("/manage/playlists/videos", response_model=UserResponse)
 async def remove_video_from_playlist(
     data: PlaylistContentUpdate,
@@ -304,12 +339,17 @@ async def remove_video_from_playlist(
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
-        # Remove video from playlist
+        # Remove the video from playlist with given video id
         result = await playlist_service.remove_video_from_playlist(
             current_user.get("id"),
             data.video_id
         )
 
+        # Invalidate user playlist cache
+        cache_key = process_cache_key()
+        await cache.h_del(cache_key, "user_playlist_contents", {"user_id": current_user.get("id")})
+
+        # Success response
         return {
             "status": True,
             "detail": result["message"]
@@ -319,7 +359,7 @@ async def remove_video_from_playlist(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Remove an existing playlist of
+# Remove an existing playlist of the user
 @userRouter.delete("/manage/playlists", response_model=UserResponse)
 async def delete_playlist(current_user: dict = Depends(JWTAuthGuard("user"))):
     try:
@@ -333,6 +373,11 @@ async def delete_playlist(current_user: dict = Depends(JWTAuthGuard("user"))):
         if not result :
             raise HTTPException(status_code=500, detail="Failed to remove playlist")
 
+        # Invalidate user playlist cache
+        cache_key = process_cache_key()
+        await cache.h_del(cache_key, "user_playlist_contents", {"user_id": current_user.get("id")})
+
+         # Success response
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -341,18 +386,14 @@ async def delete_playlist(current_user: dict = Depends(JWTAuthGuard("user"))):
 @userRouter.get("/playlist/contents", response_model=PlaylistContentsResponse)
 async def get_playlist_contents(current_user: dict = Depends(JWTAuthGuard("user"))):
     try:
-        user = await user_service.get_user_details_by_id(current_user.get("id"))
+        cache_key = process_cache_key()
 
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
+        # Check cache with user-specific key
+        cached_playlist = await cache.h_get(cache_key, "user_playlist_contents", {"user_id": current_user.get("id")})
+        if cached_playlist is not None:
+            return cached_playlist
 
-        # Get the playlist contents for user
-        playlist  = await playlist_service.get_user_playlist(current_user.get("id"))
-
-        # Check if playlist exists
-        if not playlist :
-            raise HTTPException(status_code=500, detail="Failed to fetch playlist contents")
-
+        # Fetch user playlist details
         user_playlist = await playlist_service.get_user_playlist_details(current_user.get("id"))
 
         # Check if playlist has videos
@@ -368,11 +409,16 @@ async def get_playlist_contents(current_user: dict = Depends(JWTAuthGuard("user"
         if not playlist_videos:
             raise HTTPException(status_code=404, detail="No videos found in the playlist")
 
-        return {
+        play_list_result = {
             "playlist_id": playlist_id,
             "name": name,
             "playlist_items": playlist_videos
         }
 
+        # Set playlist contents in cache
+        await cache.h_set(cache_key, "user_playlist_contents", play_list_result, {"user_id": current_user.get("id")})
+
+        # Return the playlist contents
+        return play_list_result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

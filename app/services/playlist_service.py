@@ -1,5 +1,4 @@
 # playlist_services.py
-from pydantic.v1 import EmailStr
 from pymongo.errors import PyMongoError
 from fastapi import HTTPException
 from bson import ObjectId, errors as bson_errors
@@ -73,6 +72,7 @@ class PlaylistService(BaseService):
             self.logger.error(f"DB error in get_user_playlist({user_id}): {e}")
             return None
         except HTTPException as e:
+            self.logger.error(f"HTTP error in get_user_playlist({user_id}): {e.detail}")
             return None
 
     # Check a playlist exists for a user with given ID
